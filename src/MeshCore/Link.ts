@@ -1,247 +1,203 @@
-import { SerialPort } from 'tauri-plugin-serialplugin';
-import {
-  FCmdAppStart,
-  FCmdGetContacts,
-  FCmdSetDeviceTime,
-  FCmdSendSelfAdvert,
-  FCmdSetAdvertName,
-  FCmdAddUpdateContact,
-  FCmdSendTxtMsg,
-  FCmdSetRadioParams,
-  FRespCodeSelfInfo,
-  FRespCodeContactsStart,
-  FRespCodeContact,
-  FRespCodeEndOfContacts,
-  FRespCodeSent,
-  FRespContactMsgRecv,
-  SerialFrame,
-  FRespCode,
-  FCmdCode,
-  FPushCode,
-  FSelfAdvertType,
-  Frame,
-  FTxtType,
-  FPathLenDirect,
-  FRespCodeType,
-  IRespCodeContact,
-  ICmdAddUpdateContact,
-  ICmdSetRadioParams,
-} from './Frame.ts';
+import { SerialPort } from 'tauri-plugin-serialport';
+import * as mcf from './Frame.ts';
+import { delay, uint8ArrayToHex, uint8ArrayToHexPretty } from './Helpers.ts';
 
 interface LinkOptions {
   debug?: boolean;
+  timeout?: number;
+}
+
+interface Contact {
+  publicKey: string;
+  type: mcf.FAdvType;
+  flags: number;
+  outPathLen: number;
+  outPath: Uint8Array;
+  advName: string;
+  lastAdvert: number;
+  advLat?: number;
+  advLon?: number;
+  lastMod: number;
 }
 
 export class Link {
   #port: SerialPort;
   #opts: LinkOptions;
-  #eventTarget: EventTarget;
-  #syncInProgress: boolean = false;
-  #receivedFrames: Frame[] = [];
+  #pushListeners: { [key: number]: ((data: any) => void)[] } = {};
 
   constructor(port: SerialPort, opts?: LinkOptions) {
     this.#port = port;
-    this.#opts = opts ?? { debug: false };
-    this.#eventTarget = new EventTarget();
-    this.#syncInProgress = false;
-    this.init();
-  }
-
-  async init() {
-    // Handle port disconnection
+    this.#opts = opts ?? { debug: false, timeout: 2000 };
     this.#port.disconnected(() => {
-      this.#eventTarget.dispatchEvent(new CustomEvent('disconnected'));
+      this.#triggerPushListeners(mcf.FPushCode.MsgWaiting, { error: 'disconnected' }); // or a specific disconnect code
     });
-
-    // Start reading from the serial port
-    this.readLoop().catch(err => {
-      console.error('Serial read loop error:', err);
-    });
-
-    // Send app start command
-    await this.appStart('MeshCore App', 1);
+    this.#listenForPushNotifications();
   }
 
-  async readLoop() {
+  async appStart(appName: string, appVer: number): Promise<mcf.IRespCodeSelfInfo> {
+    const appStartFrame = new mcf.FCmdAppStart({ appName, appVer }, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(appStartFrame.toUint8Array()));
+
+    return await this.#expectResponse(mcf.FRespCode.SelfInfo) as mcf.IRespCodeSelfInfo;
+  }
+
+  async getContacts(since?: number): Promise<Contact[]> {
+    const getContactsFrame = new mcf.FCmdGetContacts({ since }, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(getContactsFrame.toUint8Array()));
+
+    const contactsStart = await this.#expectResponse(mcf.FRespCode.ContactsStart) as mcf.IRespCodeContactsStart;
+    const contacts: Contact[] = [];
+
+    for (let i = 0; i < contactsStart.count; i++) {
+      const contact = await this.#expectResponse(mcf.FRespCode.Contact) as Contact;
+      contacts.push(contact);
+    }
+
+    await this.#expectResponse(mcf.FRespCode.EndOfContacts);
+
+    return contacts;
+  }
+
+  async getDeviceTime(): Promise<number | undefined> {
+    const getDeviceTimeFrame = new mcf.FCmdGetDeviceTime(this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(getDeviceTimeFrame.toUint8Array()));
+    const response = await this.#expectResponse(mcf.FRespCode.Ok) as mcf.IRespCodeOk;
+
+    return response.epochSecs;
+  }
+
+  async setDeviceTime(epochSecs: number): Promise<void> {
+    const setDeviceTimeFrame = new mcf.FCmdSetDeviceTime({ epochSecs }, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(setDeviceTimeFrame.toUint8Array()));
+    await this.#expectResponse(mcf.FRespCode.Ok);
+  }
+
+  async sendSelfAdvert(type: mcf.FSelfAdvertType = mcf.FSelfAdvertType.ZeroHop): Promise<void> {
+    const sendSelfAdvertFrame = new mcf.FCmdSendSelfAdvert({ type }, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(sendSelfAdvertFrame.toUint8Array()));
+    await this.#expectResponse(mcf.FRespCode.Ok);
+  }
+
+  async setAdvertName(name: string): Promise<void> {
+    const setAdvertNameFrame = new mcf.FCmdSetAdvertName({ name }, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(setAdvertNameFrame.toUint8Array()));
+    await this.#expectResponse(mcf.FRespCode.Ok);
+  }
+
+  async syncNextMessage(): Promise<mcf.IRespContactMsgRecv | null> {
+    const syncNextMessageFrame = new mcf.FCmdSyncNextMessage(null, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(syncNextMessageFrame.toUint8Array()));
+    try {
+      const message = await this.#expectResponse(mcf.FRespCode.ContactMsgRecv) as mcf.IRespContactMsgRecv;
+      return message;
+    } catch (error) {
+      // Handle no message case, which is signified by a timeout or specific error
+      return null;
+    }
+  }
+
+  async addUpdateContact(contact: mcf.ICmdAddUpdateContact): Promise<void> {
+    const addUpdateContactFrame = new mcf.FCmdAddUpdateContact(contact, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(addUpdateContactFrame.toUint8Array()));
+    await this.#expectResponse(mcf.FRespCode.Ok);
+  }
+
+  async sendTxtMsg(msg: mcf.ICmdSendTxtMsg): Promise<mcf.IRespCodeSent> {
+    const sendTxtMsgFrame = new mcf.FCmdSendTxtMsg(msg, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(sendTxtMsgFrame.toUint8Array()));
+    return await this.#expectResponse(mcf.FRespCode.Sent) as mcf.IRespCodeSent;
+  }
+
+  async setRadioParams(params: mcf.ICmdSetRadioParams): Promise<void> {
+    const setRadioParamsFrame = new mcf.FCmdSetRadioParams(params, this.#opts);
+    await this.#write(mcf.SerialFrame.createFrame(setRadioParamsFrame.toUint8Array()));
+    await this.#expectResponse(mcf.FRespCode.Ok);
+  }
+
+  async #read(size: number) {
+    console.log(`[serial] request(requested: ${size}, buffer: ${await this.#port.bytesToRead()})`);
+    if(await this.#port.bytesToRead() === 0) console.trace();
+
+    const reply = await this.#port.readBinary({ size, timeout: this.#opts.timeout });
+
+    if(this.#opts.debug) {
+      console.log('[serial] in: ', uint8ArrayToHexPretty(reply));
+    }
+
+    return reply;
+  }
+
+  async #write(data: Uint8Array) {
+    if(this.#opts.debug) {
+      console.log('[serial] out:', uint8ArrayToHexPretty(data));
+    }
+
+    return await this.#port.writeBinary(data)
+  }
+
+  async #expectResponse(expectedCode: mcf.FRespCode, timeout: number = 5000): Promise<object | null> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const frameHeader = await this.#read(3);
+      if (frameHeader.length === 3) {
+        const header = mcf.SerialFrame.parseHeader(frameHeader);
+        const frameBody = await this.#read(header.length);
+        const parsedFrame = mcf.SerialFrame.parseBody(header, frameBody);
+        if (this.#opts.debug) {
+          console.debug('expectResponse()', { header, parsedFrame });
+        }
+
+        if (parsedFrame && 'code' in parsedFrame && parsedFrame.code === expectedCode) {
+          return parsedFrame;
+        }
+      }
+    }
+    throw new Error(`timeout waiting for response code ${expectedCode}`);
+  }
+
+  async #listenForPushNotifications(): Promise<void> {
     while (this.#port.isOpen) {
+      await delay(500); // poll every 500msec
       try {
         if(await this.#port.bytesToRead() < 3) continue;
-        const frameHeader = await this.#port.readBinary({ size: 3 });
-        const header = SerialFrame.parseHeader(frameHeader);
-        const frameBody = await this.#port.readBinary({ size: header.length });
-        const parsedFrame = SerialFrame.parseBody(header, frameBody);
+        const frameHeader = await this.#read(3);
+        if (frameHeader.length === 3) {
+          const header = mcf.SerialFrame.parseHeader(frameHeader);
+          if (this.#opts.debug) {
+            console.debug('listenForPushNotifications()', { header });
+          }
 
-        if (parsedFrame) {
-          if(header.isReply) {
-            if(this.#syncInProgress) {
-              this.#receivedFrames.push(parsedFrame);
-            }
-          } else {
-            this.handlePushNotification(parsedFrame);
+          const frameBody = await this.#read(header.length);
+          const parsedFrame = mcf.SerialFrame.parseBody(header, frameBody);
+
+          if (this.#opts.debug) {
+            console.debug('listenForPushNotifications()', { frameBody: uint8ArrayToHex(frameBody), parsedFrame });
+          }
+
+          if (parsedFrame && 'code' in parsedFrame) {
+            this.#triggerPushListeners(parsedFrame.code as number, parsedFrame);
           }
         }
-      } catch (err) {
-        console.error('Error reading from serial port:', err);
-        // Handle read errors, potentially implement re-connection logic
+      } catch (error) {
+        console.error('Error in push notification listener:', error);
         break;
       }
     }
   }
 
-  private async sendFrame(frame: Frame) {
-    const serialFrame = SerialFrame.createFrame(frame.toUint8Array());
-    await this.#port.writeBinary(serialFrame);
-    if (this.#opts.debug) {
-      console.debug('Sent frame:', frame);
+  onPushNotification(code: mcf.FPushCode, callback: (data: any) => void): void {
+    if (!this.#pushListeners[code]) {
+      this.#pushListeners[code] = [];
     }
+    this.#pushListeners[code].push(callback);
   }
 
-  async appStart(appName: string, appVer: number) {
-    const frame = new FCmdAppStart({ appName, appVer }, this.#opts);
-    await this.sendFrame(frame);
-  }
-
-  async getContacts(since?: number): Promise<IRespCodeContact[]> {
-    const frame = new FCmdGetContacts({ since }, this.#opts);
-    await this.sendFrame(frame);
-    return await this.syncResponse(FCmdCode.GetContacts) as IRespCodeContact[];
-  }
-
-  async addUpdateContact(contact: ICmdAddUpdateContact) {
-    const frame = new FCmdAddUpdateContact(contact, this.#opts);
-    await this.sendFrame(frame);
-    return await this.syncResponse(FCmdCode.AddUpdateContact);
-  }
-
-  async setDeviceTime(epochSecs: number) {
-    const frame = new FCmdSetDeviceTime({ epochSecs }, this.#opts);
-    await this.sendFrame(frame);
-    return await this.syncResponse(FCmdCode.SetDeviceTime);
-  }
-
-  async sendSelfAdvert(type: FSelfAdvertType = FSelfAdvertType.ZeroHop) {
-    const frame = new FCmdSendSelfAdvert({ type }, this.#opts);
-    await this.sendFrame(frame);
-    return await this.syncResponse(FCmdCode.SendSelfAdvert);
-  }
-
-  async setAdvertName(name: string) {
-    const frame = new FCmdSetAdvertName({ name }, this.#opts);
-    await this.sendFrame(frame);
-    return await this.syncResponse(FCmdCode.SetAdvertName);
-  }
-
-  async sendTxtMsg(
-    txtType: FTxtType,
-    attempt: number,
-    senderTimestamp: number,
-    pubKeyPrefix: string,
-    text: string,
-  ) {
-    const frame = new FCmdSendTxtMsg({ txtType, attempt, senderTimestamp, pubKeyPrefix, text }, this.#opts);
-    await this.sendFrame(frame);
-
-    return await this.syncResponse(FCmdCode.SendTxtMsg) as IRespCodeSent;
-  }
-
-  async syncNextMessage() {
-    return await this.syncResponse(FCmdCode.SyncNextMessage);
-  }
-
-  async setRadioParams(params: ICmdSetRadioParams) {
-    const frame = new FCmdSetRadioParams(params, this.#opts);
-    await this.sendFrame(frame);
-
-    return await this.syncResponse(FCmdCode.SetRadioParams);
-  }
-
-  async syncResponse(cmdCode: number): Promise<IRespCodeContact[] | IRespCodeSent | null> {
-    this.#syncInProgress = true;
-    this.#receivedFrames = [];
-    // Timeout to prevent infinite wait
-    const timeout = setTimeout(() => {
-      this.#syncInProgress = false;
-      this.#receivedFrames = [];
-    }, 5000);
-
-    while (this.#syncInProgress) {
-      if (this.#receivedFrames.length > 0) {
-        switch (cmdCode) {
-          case FCmdCode.GetContacts: {
-            const contacts = [];
-            for(const frame of this.#receivedFrames) {
-              if(frame instanceof FRespCodeContactsStart) {
-                console.log('Total contacts received', frame.count);
-              } else if (frame instanceof FRespCodeContact) {
-                contacts.push(frame);
-              } else if (frame instanceof FRespCodeEndOfContacts) {
-                this.#syncInProgress = false;
-                clearTimeout(timeout);
-                return contacts;
-              }
-            }
-            break;
-          }
-          case FCmdCode.AddUpdateContact:
-          case FCmdCode.SetDeviceTime:
-          case FCmdCode.SendSelfAdvert:
-          case FCmdCode.SetAdvertName:
-          case FCmdCode.SetRadioParams: {
-            const responseCode = this.#receivedFrames[0];
-            this.#syncInProgress = false;
-            clearTimeout(timeout);
-            if(responseCode instanceof Frame) {
-              return responseCode[0] === FRespCode.Ok ? true : false;
-            } else {
-              return false;
-            }
-          }
-          case FCmdCode.SendTxtMsg: {
-            const sendResponse = this.#receivedFrames[0];
-            this.#syncInProgress = false;
-            clearTimeout(timeout);
-            if(sendResponse instanceof FRespCodeSent) {
-              return sendResponse;
-            } else {
-              return null;
-            }
-          }
-        }
-      }
-      // Prevent event loop blocking
-      await new Promise(resolve => setTimeout(resolve, 5));
+  #triggerPushListeners(code: number, data: any): void {
+    const listeners = this.#pushListeners[code];
+    if (listeners) {
+      listeners.forEach(callback => callback(data));
     }
-
-    clearTimeout(timeout);
-    return null;
-  }
-
-  private handlePushNotification(frame: Frame) {
-    if (this.#opts.debug) {
-      console.debug('Received push notification:', frame);
-    }
-
-    switch (frame[0]) {
-      case FPushCode.Advert:
-        this.#eventTarget.dispatchEvent(new CustomEvent('advert', { detail: frame }));
-        break;
-      case FPushCode.PathUpdated:
-        this.#eventTarget.dispatchEvent(new CustomEvent('pathUpdated', { detail: frame }));
-        break;
-      case FPushCode.SendConfirmed:
-        this.#eventTarget.dispatchEvent(new CustomEvent('sendConfirmed', { detail: frame }));
-        break;
-      case FPushCode.MsgWaiting:
-        this.#eventTarget.dispatchEvent(new CustomEvent('msgWaiting'));
-        break;
-    }
-  }
-
-  on(eventName: string, listener: EventListenerOrEventListenerObject) {
-    this.#eventTarget.addEventListener(eventName, listener);
-  }
-
-  off(eventName: string, listener: EventListenerOrEventListenerObject) {
-    this.#eventTarget.removeEventListener(eventName, listener);
   }
 }
+
+export * from './Frame.ts';
