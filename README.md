@@ -1,2 +1,2 @@
 # MeshCoreClient
-Mobile/Desktop MeshCore client
+Mobile and Desktop MeshCore client written in Tauri v2

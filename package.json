@@ -1,0 +1,35 @@
+{
+  "name": "meshcore-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@mnlphlp/plugin-blec": "^0.3.3",
+    "@serialport/bindings-cpp": "^13.0.1",
+    "@serialport/bindings-interface": "^1.2.2",
+    "@serialport/stream": "^13.0.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-sql": "~2.2.0",
+    "beercss": "^3.8.0",
+    "jest": "^29.7.0",
+    "material-dynamic-colors": "^1.1.2",
+    "serialport": "^13.0.0",
+    "tauri-plugin-serialplugin": "^2.8.2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@tsconfig/node23": "^23.0.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vue-tsc": "^2.1.10"
+  }
+}
