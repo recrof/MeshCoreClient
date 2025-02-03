@@ -2,6 +2,37 @@ interface uint8ArrayToHexOptions {
   pretty?: boolean
 }
 
+const DEC2HEX = (() => {
+  const alphabet = '0123456789abcdef';
+  const dec2hex16 = [...alphabet];
+  const dec2hex256 = new Array<string> (256);
+
+  for (let i = 0; i < 256; i++) {
+    dec2hex256[i] = `${dec2hex16[(i >>> 4) & 0xF]}${dec2hex16[i & 0xF]}`;
+  }
+
+  return dec2hex256;
+})();
+
+const HEX2DEC = (() => {
+  const hex2dec: Record<string, number> = {};
+
+  for ( let i = 0; i < 256; i++ ) {
+    const hex = DEC2HEX[i];
+    const firstLower = hex[0];
+    const firstUpper = firstLower.toUpperCase();
+    const lastLower = hex[1];
+    const lastUpper = lastLower.toUpperCase();
+
+    hex2dec[hex] = i;
+    hex2dec[`${firstLower}${lastUpper}`] = i;
+    hex2dec[`${firstUpper}${lastLower}`] = i;
+    hex2dec[`${firstUpper}${lastUpper}`] = i;
+  }
+
+  return hex2dec;
+})();
+
 export function uint8ArrayConcat(arrays: Uint8Array[]) {
   const totalLength = arrays.reduce((acc, arr) => acc + arr.length, 0);
   const result = new Uint8Array(totalLength);
@@ -15,25 +46,25 @@ export function uint8ArrayConcat(arrays: Uint8Array[]) {
   return result;
 }
 
-export function hexToUint8Array(hexString: string, maxLength: number): Uint8Array {
-  const hex = hexString.startsWith('0x') ? hexString.substring(2) : hexString;
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let c = 0; c < hex.length; c += 2) {
-    const byte = parseInt(hex.substring(c, c + 2), 16);
-    if (Number.isNaN(byte)) {
-      throw new Error(`Invalid hex character at position ${c}`);
-    }
-    bytes[c / 2] = byte;
-    if (bytes.length === maxLength) {
-      break;
-    }
+export function hexToUint8Array(hexString: string, maxLength?: number): Uint8Array {
+  const length = maxLength ?? hexString.length / 2;
+  const result = new Uint8Array(length);
+
+  for (let i = 0; i < length; i++) {
+    result[i] = HEX2DEC[hexString.slice (i * 2, (i * 2) + 2)];
   }
 
-  return bytes;
+  return result;
 }
 
 export function uint8ArrayToHex(bytes: Uint8Array, opts?: uint8ArrayToHexOptions): string {
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join(opts?.pretty ? ' ' : '');
+  const hex = [];
+
+  for (let i = 0, l = bytes.length; i < l; i++) {
+    hex.push(DEC2HEX[bytes[i]]);
+  }
+
+  return hex.join(opts?.pretty ? ' ' : '');
 }
 
 export function uint8ArrayToHexPretty(bytes: Uint8Array) {

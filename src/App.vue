@@ -18,6 +18,12 @@ interface SerialState {
   selected: SerialPort | null,
 };
 
+interface Message {
+  text: string,
+  own: boolean,
+  timestamp: number,
+};
+
 interface Chat {
   updated: number,
   name: string,
@@ -44,7 +50,10 @@ const app = reactive({
     lastSync: 0,
     list: []
   },
-  chats: []
+  chats: [] as Chat[],
+  selectedChat: null,
+  editMessage: '',
+  lastContactRefresh: 0
 });
 
 const connectSerial = async (path: string) => {
@@ -84,23 +93,51 @@ const disconnectSerial = async () => {
 }
 
 const processSerial = async (port: SerialPort) => {
-  const link = app.link = new Link(port, { debug: true, timeout: 200 });
+  const link = app.link = new Link(port, { debug: true, timeout: 2000 });
 
-  link.onPushNotification(FPushCode.Advert, (data) => {
-    console.log('new advertisment', data);
+  link.onPushNotification(FPushCode.Advert, async (data) => {
+    console.log('FPushCode.Advert', data);
+    await refreshContacts();
   })
 
   link.onPushNotification(FPushCode.SendConfirmed, (data) => {
-    console.log('new send confirmed', data);
+    console.log('FPushCode.SendConfirmed', data);
+  })
+
+  link.onPushNotification(FPushCode.MsgWaiting, async (data) => {
+    console.log('FPushCode.MsgWaiting', data);
+
+    const message = await link.syncNextMessage();
+    if(!message) return;
+    const chat = app.chats.find(chat => chat.publicKey.startsWith(message.pubKeyPrefix));
+    chat?.messages.push({
+      timestamp: message.senderTimestamp,
+      text: message.text,
+      own: false
+    })
   })
 
   console.log('app', app);
   const deviceInfo = await link.appStart('MCC', 1);
   delete deviceInfo.code;
   app.deviceInfo = deviceInfo;
-  // await link.setDeviceTime(getCurrentTimestamp());
+  await link.setDeviceTime(getCurrentTimestamp());
+  await link.sendSelfAdvert(1);
+  await refreshContacts()
+}
 
-  app.contacts.list = await link.getContacts();
+const refreshContacts = async () => {
+  app.contacts.list = await link.getContacts(app.lastContactRefresh);
+  for(const contact of app.contacts.list) {
+    if(app.chats.some(chat => chat.publicKey === contact.publicKey)) continue;
+    app.chats.push({
+      updated: 0,
+      publicKey: contact.publicKey,
+      name: contact.name,
+      messages: [] as Message[]
+    })
+  }
+  app.lastContactRefresh = getCurrentTimestamp();
 }
 
 const saveUserName = () => {
@@ -119,6 +156,30 @@ const refreshPorts = async () => {
   console.log(app.serial.ports);
 }
 
+const openChat = (contact) => {
+  const chat = app.chats.find(chat => chat.publicKey === contact.publicKey);
+  if(!chat) return;
+  app.selectedChat = chat;
+  app.editMessage = '';
+}
+
+const sendMessage = async () => {
+  const message = app.editMessage;
+  await app.link.sendTxtMsg({
+    txtType: 0,
+    attempt: 1,
+    senderTimestamp: getCurrentTimestamp(),
+    pubKeyPrefix: app.selectedChat.publicKey.substring(0, 12),
+    text: message
+  });
+  app.selectedChat.messages.push({
+    text: message,
+    own: true,
+    timestamp: getCurrentTimestamp()
+  });
+  app.editMessage = '';
+}
+
 onMounted(async () => {
   refreshPorts();
 });
@@ -126,7 +187,29 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container">
+  <div class="container" v-if="app.selectedChat">
+    <header class="max fixed secondary-container">
+      <nav>
+        <button class="circle transparent" @click="app.selectedChat = null"><i>arrow_back</i></button>
+        <h5 class="max">{{ app.selectedChat.name }}</h5>
+        <button class="circle transparent"><i>more_vert</i></button>
+      </nav>
+    </header>
+    <div class="chat-container">
+      <div class="messages">
+        <p v-for="msg in app.selectedChat.messages" class="round primary-container" :class="msg.own ? 'right secondary' : 'left primary'">{{ msg.text }}</p>
+      </div>
+    </div>
+    <footer>
+      <nav>
+        <div class="field label border max">
+          <input type="text" placeholder=" " @keyup.enter="sendMessage" v-model="app.editMessage"><label>Message</label>
+        </div>
+        <button @click="sendMessage"><i>send</i></button>
+      </nav>
+    </footer>
+  </div>
+  <div v-else class="container">
     <header class="max fixed secondary-container">
       <nav>
         <a class="circle transparent"><i>contacts</i></a>
@@ -158,6 +241,7 @@ onMounted(async () => {
 html {
   user-select: none;
   cursor: default;
+  box-sizing: border-box;
 }
 
 button {
@@ -165,5 +249,36 @@ button {
 }
 .container {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+.messages {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.messages p {
+  padding: 2px 12px;
+}
+
+.messages p.right {
+  align-self: flex-end;
+}
+.messages p.left {
+  align-self: flex-start;
+}
+
+.send-bottom {
+  display: flex;
+  flex-direction: row;
+}
+.send-bottom div {
+  flex-grow: 1;
+  margin-block-end: 2px;
 }
 </style>

@@ -149,7 +149,7 @@ export abstract class Frame {
       } else if (field.type === FrameFieldType.string) {
         frameParts.push(textEncoder.encode(value.toString()));
       } else if (field.type === FrameFieldType.hexString && typeof value === 'string') {
-        frameParts.push(hexToUint8Array(value, field.size ?? value.length / 2));
+        frameParts.push(hexToUint8Array(value, field.size));
       } else if (field.type === FrameFieldType.cString) {
         const binString = textEncoder.encode(value.toString());
         if (!field.size) {
