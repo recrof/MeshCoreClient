@@ -7,7 +7,6 @@
   ],
   "permissions": [
     "core:default",
-    "blec:default",
     "serialplugin:default",
     "serialplugin:allow-read-binary",
     "serialplugin:allow-bytes-to-read"

@@ -157,6 +157,7 @@ const sendMessage = async () => {
     pubKeyPrefix: app.chat.selected.publicKey.substring(0, 12),
     text: message
   });
+
   app.chat.selected.messages.push({
     text: message,
     own: true,
@@ -171,7 +172,7 @@ const selfAnnounce = async () => {
 
 onMounted(async () => {
   refreshSerialPorts();
-  refreshBluetooth();
+  // refreshBluetooth();
 });
 
 </script>
@@ -180,7 +181,7 @@ onMounted(async () => {
   <div class="container" v-if="app.pageSelected === 'chat' && app.chat.selected">
     <header class="max fixed secondary-container">
       <nav>
-        <button class="circle transparent" @click="app.chat.selected = null"><i>arrow_back</i></button>
+        <button class="circle transparent" @click="app.chat.selected = null;app.pageSelected = 'contacts'"><i>arrow_back</i></button>
         <h5 class="max">{{ app.chat.selected.name }}</h5>
         <button class="circle transparent"><i>more_vert</i></button>
       </nav>
@@ -207,15 +208,15 @@ onMounted(async () => {
       <nav>
         <a class="hidden circle transparent"><i>contacts</i></a>
         <span class="max">
-          <div v-if="app.serial.connected" class="field label prefix border"><i>person</i><input type="text" placeholder=" " v-model="app.deviceInfo.name" @keyup.enter="saveUserName"><label>User Name</label></div>
+          <div v-if="app.link.isConnected" class="field label prefix border"><i>person</i><input type="text" placeholder=" " v-model="app.deviceInfo.name" @keyup.enter="saveUserName"><label>User Name</label></div>
         </span>
-        <template v-if="app.serial.connected">
+        <template v-if="app.link.isConnected">
           <a class="circle transparent" name="Flood announce" @click="selfAnnounce()"><i>cell_tower</i></a>
           <a data-ui="#serial-ports-actions" :title="app.serial.selected?.options.path">
             <i>usb</i>
             <menu class="left no-wrap" id="serial-ports-actions">
               <a data-ui="menu-selector" @click="console.log(app.serial)">debug info</a>
-              <a data-ui="menu-selector" @click="disconnectSerial()">disconnect [{{ app.serial.selected?.options.path }}]</a>
+              <a data-ui="menu-selector" @click="app.link.disconnect()">disconnect [{{ app.serial.selected?.options.path }}]</a>
             </menu>
           </a>
         </template>
@@ -227,12 +228,12 @@ onMounted(async () => {
             </menu>
           </a>
         </template>
-        <template v-if="app.bluetooth?.selected?.isConnected">
+        <template v-if="app.link.isConnected && app.link.linkType">
           <a  data-ui="#bluetooth-ports-actions" :title="app.bluetooth.selected?.name">
             <i>bluetooth_connected</i>
             <menu class="left no-wrap" id="bluetooth-ports-actions">
               <a data-ui="menu-selector" @click="console.log(app.bluetooth)">debug info</a>
-              <a data-ui="menu-selector" @click="disconnectBluetooth()">disconnect [{{ app.bluetooth.selected?.name }}]</a>
+              <a data-ui="menu-selector" @click="app.link.disconnect()">disconnect [{{ app.bluetooth.selected?.name }}]</a>
             </menu>
           </a>
         </template>

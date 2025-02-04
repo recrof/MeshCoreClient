@@ -1,12 +1,10 @@
 import { SerialPort } from 'tauri-plugin-serialplugin';
+
+/*
 import {
-  BleDevice,
-  getConnectionUpdates,
-  send,
-  read,
-  connect,
-  disconnect,
+  BleDevice, getConnectionUpdates,send, read, connect, disconnect,
 } from '@mnlphlp/plugin-blec';
+*/
 
 import * as mcf from './Frame.ts';
 import { delay, uint8ArrayToHexPretty } from './Helpers.ts';
@@ -36,16 +34,25 @@ export enum LinkType {
 
 export class Link {
   private port: SerialPort | null = null;
-  private bleDevice: BleDevice | null = null;
+//  private bleDevice: BleDevice | null = null;
   private bleCharacteristic: string | null = null;
   private opts: LinkOptions;
   private pushListeners: { [key: number]: ((data: any) => void)[] } = {};
   private linkType: LinkType;
   public isConnected: boolean = false;
+  private isReading: boolean = false;
 
   constructor(opts?: LinkOptions) {
     this.opts = opts ?? { debug: false, timeout: 2000 };
     this.linkType = LinkType.Serial; // Default to serial
+  }
+
+  serialConnected(): boolean {
+    return this.linkType === LinkType.Bluetooth && this.isConnected
+  }
+
+  bluetoothConnected(): boolean {
+    return this.linkType === LinkType.Serial && this.isConnected
   }
 
   async connectSerial(path: string, baudRate: number): Promise<void> {
@@ -61,7 +68,7 @@ export class Link {
     });
     this.listenForPushNotifications();
   }
-
+/*
   async connectBluetooth(device: BleDevice, characteristic: string): Promise<void> {
     this.linkType = LinkType.Bluetooth;
     this.bleDevice = device;
@@ -82,17 +89,20 @@ export class Link {
 
     this.listenForPushNotifications();
   }
-
+*/
   async disconnect(): Promise<void> {
     if (this.linkType === LinkType.Serial && this.port) {
       await this.port.close();
       this.port = null;
-    } else if (this.linkType === LinkType.Bluetooth && this.bleDevice) {
+    }
+    /*
+    else if (this.linkType === LinkType.Bluetooth && this.bleDevice) {
       await disconnect();
       this.bleDevice = null;
       this.bleCharacteristic = null;
     }
     this.isConnected = false;
+    */
   }
 
   async appStart(appName: string, appVer: number): Promise<mcf.IRespCodeSelfInfo> {
@@ -175,8 +185,20 @@ export class Link {
     await this.expectResponse(mcf.FRespCode.Ok);
   }
 
+  private async acquireReadLock(): Promise<void> {
+    while (this.isReading) {
+      await delay(50);
+    }
+    this.isReading = true;
+  }
+
+  private releaseReadLock(): void {
+    this.isReading = false;
+  }
+
   private async read(size?: number): Promise<Uint8Array> {
-    let reply;
+    let reply = new Uint8Array();
+    await this.acquireReadLock();
     if (this.linkType === LinkType.Serial) {
       if(!this.port) throw Error('SerialPort not initialized');
       console.log(`[serial] request(requested: ${size}, buffer: ${await this.port.bytesToRead()})`);
@@ -186,7 +208,9 @@ export class Link {
       if (this.opts.debug) {
         console.log('[serial] in: ', uint8ArrayToHexPretty(reply));
       }
-    } else {
+    }
+    /*
+    else {
       if(!this.bleCharacteristic) throw Error('bleCharacteristic not initialized');
 
       reply = await read(this.bleCharacteristic);
@@ -194,6 +218,8 @@ export class Link {
         console.log('[ble] in: ', uint8ArrayToHexPretty(reply));
       }
     }
+    */
+    this.releaseReadLock();
 
     return reply;
   }
@@ -212,7 +238,7 @@ export class Link {
       if (this.opts.debug) {
         console.log('[ble] out:', uint8ArrayToHexPretty(data));
       }
-      await send(this.bleCharacteristic, data, 'withoutResponse');
+      //await send(this.bleCharacteristic, data, 'withoutResponse');
     }
   }
 
@@ -263,21 +289,31 @@ export class Link {
 
   async listenForPushNotifications(): Promise<void> {
     while (this.isConnected) {
-      await delay(500); // poll every 500msec
       let parsedFrame;
+      await delay(50);
 
       try {
         if (this.linkType === LinkType.Serial) {
+          if(this.isReading) {
+            continue;
+          }
           const bytesToRead = await this.port?.bytesToRead() ?? 0;
 
-          if(bytesToRead < 3) { continue }
+          if(bytesToRead < 3) {
+            continue;
+          }
 
           console.log('listenForPushNotifications(): got', bytesToRead, 'in queue')
           parsedFrame = await this.getSerialFrame();
         }
         else {
+          if(this.isReading) {
+            continue;
+          }
           const rawFrame = await this.read();
-          if(rawFrame.length === 0) continue;
+          if(rawFrame.length === 0) {
+            continue;
+          }
           parsedFrame = mcf.FrameParser.parse(true, rawFrame);
         }
 

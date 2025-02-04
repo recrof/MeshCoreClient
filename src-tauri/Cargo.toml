@@ -2,7 +2,7 @@
 name = "meshcore-client"
 version = "0.1.0"
 description = "MeshCore Client"
-authors = ["you"]
+authors = ["recrof"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -22,11 +22,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri-plugin-blec = "0.3.5"
+# tauri-plugin-blec = "0.3.5"
 tauri-plugin-serialplugin = "2.6.0"
-# tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 
 [env]
 OPENSSL_DIR = "/opt/homebrew/Cellar/openssl@3/3.4.0"
-# AR = '/Users/$USER/Library/Android/sdk/ndk/25.0.8775105/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android-ar'
-CC = "/Users/$USER/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android27-clang"
