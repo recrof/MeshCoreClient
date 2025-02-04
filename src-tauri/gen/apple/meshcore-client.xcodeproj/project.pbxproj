@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -17,13 +17,29 @@
 		A9424ACED27F58D1DC57DD94 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1D1ACCD47BF3164674E15A91 /* Metal.framework */; };
 		C8C84BF4F3ADB9A3E881318B /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = E57107D7D270D7B046EC3A4A /* main.mm */; };
 		DE5B6105142E0CD835901732 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A25FEEA76A61E484FD4E2EA /* UIKit.framework */; };
+		E371FB7A2D5202E10020F41A /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E371FB782D5202D90020F41A /* CoreBluetooth.framework */; };
+		E371FB7B2D5202E10020F41A /* CoreBluetooth.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E371FB782D5202D90020F41A /* CoreBluetooth.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		EBBFF83226D0C7DF288FC412 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5742993A45FA029920D439E6 /* Security.framework */; };
 		F48A357B364FE009C0F01071 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F274B2D87063875A43362C46 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		E371FB7C2D5202E10020F41A /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E371FB7B2D5202E10020F41A /* CoreBluetooth.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		1611DED7E068E7B4E74DB90A /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
-		1BBC88268487A33FAC44C786 /* meshcore-client_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "meshcore-client_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1BBC88268487A33FAC44C786 /* meshcore-client.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "meshcore-client.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D1ACCD47BF3164674E15A91 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		1DB622C58CAC7F90F0BA1FB6 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		2EAF1AF27927A9277D7B1914 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -32,14 +48,15 @@
 		58055FCA92E75D463FE3672D /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 		5CD5C675B3F6724E802E02A2 /* meshcore-client_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "meshcore-client_iOS.entitlements"; sourceTree = "<group>"; };
 		6A25FEEA76A61E484FD4E2EA /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		89AE0AED89EFFE5294EC764F /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		89AE0AED89EFFE5294EC764F /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
 		8E1D46AE10F9C082A76F4D67 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		A438067FB5393DC4D841E756 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		E371FB782D5202D90020F41A /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = System/Library/Frameworks/CoreBluetooth.framework; sourceTree = SDKROOT; };
 		E57107D7D270D7B046EC3A4A /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		EDD841B7313335FF87D354DC /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		F274B2D87063875A43362C46 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F47D2E1C7E830C010211599D /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		FFCA6A772666C1B3595396AB /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		FFCA6A772666C1B3595396AB /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +65,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				01B3D297E6527D1FA259F577 /* libapp.a in Frameworks */,
+				E371FB7A2D5202E10020F41A /* CoreBluetooth.framework in Frameworks */,
 				2EAC644623EDED685653A9E1 /* CoreGraphics.framework in Frameworks */,
 				A9424ACED27F58D1DC57DD94 /* Metal.framework in Frameworks */,
 				A91ECC52EE19CD9679394B15 /* MetalKit.framework in Frameworks */,
@@ -81,6 +99,7 @@
 		22E6C78B8360909D33C4BE34 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				E371FB782D5202D90020F41A /* CoreBluetooth.framework */,
 				EDD841B7313335FF87D354DC /* CoreGraphics.framework */,
 				1611DED7E068E7B4E74DB90A /* libapp.a */,
 				1D1ACCD47BF3164674E15A91 /* Metal.framework */,
@@ -112,7 +131,7 @@
 		5ABCD6107C408E99601BF041 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1BBC88268487A33FAC44C786 /* meshcore-client_iOS.app */,
+				1BBC88268487A33FAC44C786 /* meshcore-client.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,6 +180,7 @@
 				A6A3D28890D839E46F075874 /* Sources */,
 				87E090DCB2692E9BBA9124AD /* Resources */,
 				10C38C1EB7330311EA3096BA /* Frameworks */,
+				E371FB7C2D5202E10020F41A /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -168,7 +188,7 @@
 			);
 			name = "meshcore-client_iOS";
 			productName = "meshcore-client_iOS";
-			productReference = 1BBC88268487A33FAC44C786 /* meshcore-client_iOS.app */;
+			productReference = 1BBC88268487A33FAC44C786 /* meshcore-client.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -179,8 +199,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = C6F9F43DE170DB50A627A342 /* Build configuration list for PBXProject "meshcore-client" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -252,7 +270,6 @@
 		054281AF4A7FE67BF3CFCDC6 /* release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ARCHS = (
 					arm64,
 					"arm64-sim",
@@ -272,10 +289,28 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.meshcore-client.app;
+				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.meshcore-client.app";
 				PRODUCT_NAME = "meshcore-client";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -342,7 +377,6 @@
 		61C1FD3B6686490B48CB39FF /* debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ARCHS = (
 					arm64,
 					"arm64-sim",
@@ -362,10 +396,28 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = com.meshcore-client.app;
+				"LIBRARY_SEARCH_PATHS[arch=arm64-sim]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64-sim/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
+					"$(SDKROOT)/usr/lib/swift",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.meshcore-client.app";
 				PRODUCT_NAME = "meshcore-client";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

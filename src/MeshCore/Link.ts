@@ -1,4 +1,4 @@
-import { SerialPort } from 'tauri-plugin-serialport';
+import { SerialPort } from 'tauri-plugin-serialplugin';
 import * as mcf from './Frame.ts';
 import { delay, uint8ArrayToHex, uint8ArrayToHexPretty } from './Helpers.ts';
 

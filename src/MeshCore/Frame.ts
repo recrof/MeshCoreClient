@@ -196,7 +196,6 @@ export abstract class Frame {
   }
 
   private parseFrame(rawFrame: Uint8Array) {
-    const fields = this.constructor.prototype.fields;
     let index = 0;
     const textDecoder = new TextDecoder();
     const resultParams: { [key: string]: string | number | Uint8Array } = {};
@@ -526,7 +525,7 @@ export class FRespCodeSelfInfo extends Frame {
     count: uint32    // total number of contacts
   }
 */
-interface IRespCodeContactsStart {
+export interface IRespCodeContactsStart {
   count: number
 }
 export class FRespCodeContactsStart extends Frame {
@@ -794,7 +793,45 @@ interface SerialFrameHeader {
   length: number
 }
 
-export class SerialFrame {
+export class FrameParser {
+  static parse(isReply, frame: Uint8Array): object | null {
+    const frameCode = frame[0];
+    if(isReply) {
+      switch (frameCode) {
+        // push codes
+        case FPushCode.Advert: return new FPushAdvert(frame).parse();
+        case FPushCode.PathUpdated: return new FPushPathUpdated(frame).parse();
+        case FPushCode.SendConfirmed: return new FPushSendConfirmed(frame).parse();
+        case FPushCode.MsgWaiting: return new FPushMsgWaiting(frame).parse();
+
+        // command responses
+        case FRespCode.SelfInfo: return new FRespCodeSelfInfo(frame).parse();
+        case FRespCode.ContactsStart: return new FRespCodeContactsStart(frame).parse();
+        case FRespCode.Contact: return new FRespCodeContact(frame).parse();
+        case FRespCode.EndOfContacts: return new FRespCodeEndOfContacts(frame).parse();
+        case FRespCode.Sent: return new FRespCodeSent(frame).parse();
+        case FRespCode.ContactMsgRecv: return new FRespContactMsgRecv(frame).parse();
+        case FRespCode.Ok: return new FRespCodeOk(frame).parse();
+        case FRespCode.Err: return new FRespCodeErr(frame).parse();
+      }
+    } else {
+      // we shoudn't be needing to parse commands apart from testing
+      switch (frameCode) {
+        case FCmdCode.AppStart: return new FCmdAppStart(frame).parse();
+        case FCmdCode.GetContacts: return new FCmdGetContacts(frame).parse();
+        case FCmdCode.AddUpdateContact: return new FCmdAddUpdateContact(frame).parse();
+        case FCmdCode.SetDeviceTime: return new FCmdSetDeviceTime(frame).parse();
+        case FCmdCode.SendSelfAdvert: return new FCmdSendSelfAdvert(frame).parse();
+        case FCmdCode.SetAdvertName: return new FCmdSetAdvertName(frame).parse();
+        case FCmdCode.SendTxtMsg: return new FCmdSendTxtMsg(frame).parse();
+        case FCmdCode.SetRadioParams: return new FCmdSetRadioParams(frame).parse();
+      }
+   }
+
+    throw new Error(`Unknown frame code: ${frameCode}`);
+  }
+}
+export class SerialFrame extends FrameParser {
   static createFrame(frame: Uint8Array) {
     const frameHeader = new Uint8Array(3);
     frameHeader[0] = SerialFrameType.Outgoing;
@@ -829,39 +866,6 @@ export class SerialFrame {
   }
 
   static parseBody(frameHeader: SerialFrameHeader, frameBody: Uint8Array): object | null {
-    const frameCode = frameBody[0];
-    if(frameHeader.isReply) {
-      switch (frameCode) {
-        // push codes
-        case FPushCode.Advert: return new FPushAdvert(frameBody).parse();
-        case FPushCode.PathUpdated: return new FPushPathUpdated(frameBody).parse();
-        case FPushCode.SendConfirmed: return new FPushSendConfirmed(frameBody).parse();
-        case FPushCode.MsgWaiting: return new FPushMsgWaiting(frameBody).parse();
-
-        // command responses
-        case FRespCode.SelfInfo: return new FRespCodeSelfInfo(frameBody).parse();
-        case FRespCode.ContactsStart: return new FRespCodeContactsStart(frameBody).parse();
-        case FRespCode.Contact: return new FRespCodeContact(frameBody).parse();
-        case FRespCode.EndOfContacts: return new FRespCodeEndOfContacts(frameBody).parse();
-        case FRespCode.Sent: return new FRespCodeSent(frameBody).parse();
-        case FRespCode.ContactMsgRecv: return new FRespContactMsgRecv(frameBody).parse();
-        case FRespCode.Ok: return new FRespCodeOk(frameBody).parse();
-        case FRespCode.Err: return new FRespCodeErr(frameBody).parse();
-      }
-    } else {
-      // we shoudn't be needing to parse commands apart from testing
-      switch (frameCode) {
-        case FCmdCode.AppStart: return new FCmdAppStart(frameBody).parse();
-        case FCmdCode.GetContacts: return new FCmdGetContacts(frameBody).parse();
-        case FCmdCode.AddUpdateContact: return new FCmdAddUpdateContact(frameBody).parse();
-        case FCmdCode.SetDeviceTime: return new FCmdSetDeviceTime(frameBody).parse();
-        case FCmdCode.SendSelfAdvert: return new FCmdSendSelfAdvert(frameBody).parse();
-        case FCmdCode.SetAdvertName: return new FCmdSetAdvertName(frameBody).parse();
-        case FCmdCode.SendTxtMsg: return new FCmdSendTxtMsg(frameBody).parse();
-        case FCmdCode.SetRadioParams: return new FCmdSetRadioParams(frameBody).parse();
-      }
-   }
-
-    throw new Error(`Unknown frame code: ${frameCode}`);
+    return super.parse(frameHeader.isReply, frameBody)
   }
 }
