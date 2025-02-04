@@ -70,6 +70,11 @@ enum FrameFieldType {
   bin = 'bin',
 }
 
+export interface frameParserResult {
+  code: number;
+  (key: string): number | string | Uint8Array
+}
+
 interface FrameField {
   key?: string,
   value?: string | number | Uint8Array | null | undefined,
@@ -117,7 +122,7 @@ export abstract class Frame {
     return {
       code: this.fields[0].value,
       ...this.parseFrame(this.#uint8Array)
-    }
+    } as frameParserResult;
   }
 
   private createFrame() {
@@ -794,8 +799,9 @@ interface SerialFrameHeader {
 }
 
 export class FrameParser {
-  static parse(isReply, frame: Uint8Array): object | null {
+  static parse(isReply: boolean, frame: Uint8Array): frameParserResult {
     const frameCode = frame[0];
+    console.log(frameCode, typeof frameCode);
     if(isReply) {
       switch (frameCode) {
         // push codes

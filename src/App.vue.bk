@@ -1,0 +1,247 @@
+<script setup lang="ts">
+import { onMounted, ref, reactive } from 'vue';
+import { SerialPort } from 'tauri-plugin-serialplugin';
+import { BleDevice, getConnectionUpdates, startScan, sendString, readString, unsubscribe, subscribeString, stopScan, connect, disconnect, getScanningUpdates } from '@mnlphlp/plugin-blec';
+
+import { Link, FPushCode } from './MeshCore/Link.ts';
+
+import 'beercss';
+import 'material-dynamic-colors';
+
+interface Serial {
+  name: string,
+  path: string
+};
+
+interface SerialState {
+  connected: boolean,
+  ports: Serial[] | null,
+  selected: SerialPort | null,
+};
+
+interface Message {
+  text: string,
+  own: boolean,
+  timestamp: number,
+};
+
+interface Chat {
+  updated: number,
+  name: string,
+  publicKey: string,
+  messages: Message[]
+};
+
+const getCurrentTimestamp = () => Date.now() / 1000 | 0;
+
+const app = reactive({
+  deviceInfo: {},
+  serial: {
+    selected: null,
+  } as SerialState,
+  bluetooth: {
+    selected: null,
+    char: '6E400002-B5A3-F393-E0A9-E50E24DCCA9E',
+  },
+  link: null,
+  contacts: {
+    lastSync: 0,
+    list: []
+  },
+  chats: [] as Chat[],
+  selectedChat: null,
+  editMessage: '',
+  lastContactRefresh: 0
+});
+
+
+const processSerial = async (port: SerialPort) => {
+  const link = app.link = new Link(port, { debug: true, timeout: 2000 });
+
+  link.onPushNotification(FPushCode.Advert, async (data) => {
+    console.log('FPushCode.Advert', data);
+    await refreshContacts();
+  })
+
+  link.onPushNotification(FPushCode.SendConfirmed, (data) => {
+    console.log('FPushCode.SendConfirmed', data);
+  })
+
+  link.onPushNotification(FPushCode.MsgWaiting, async (data) => {
+    console.log('FPushCode.MsgWaiting', data);
+
+    const message = await link.syncNextMessage();
+    if(!message) return;
+    const chat = app.chats.find(chat => chat.publicKey.startsWith(message.pubKeyPrefix));
+    chat?.messages.push({
+      timestamp: message.senderTimestamp,
+      text: message.text,
+      own: false
+    })
+  })
+
+  console.log('app', app);
+  const deviceInfo = await link.appStart('MCC', 1);
+  delete deviceInfo.code;
+  app.deviceInfo = deviceInfo;
+  await link.setDeviceTime(getCurrentTimestamp());
+  await link.sendSelfAdvert(1);
+  await refreshContacts()
+}
+
+const refreshContacts = async () => {
+  app.contacts.list = await link.getContacts(app.lastContactRefresh);
+  for(const contact of app.contacts.list) {
+    if(app.chats.some(chat => chat.publicKey === contact.publicKey)) continue;
+    app.chats.push({
+      updated: 0,
+      publicKey: contact.publicKey,
+      name: contact.name,
+      messages: [] as Message[]
+    })
+  }
+  app.lastContactRefresh = getCurrentTimestamp();
+}
+
+const saveUserName = () => {
+  console.log('saveUserName');
+  app.link.setAdvertName(app.deviceInfo.name);
+}
+
+const refreshPorts = async () => {
+  const allPorts = Object.entries(await SerialPort.available_ports());
+
+  app.serial.ports = allPorts
+    .filter(([_, port]) => port.type === 'USB')
+    .map(([path, port]) => ({ name: port.product, path: path }))
+    .sort((a, b) => a.path.localeCompare(b.path)) as Serial[];
+
+  console.log(app.serial.ports);
+}
+
+const openChat = (contact) => {
+  const chat = app.chats.find(chat => chat.publicKey === contact.publicKey);
+  if(!chat) return;
+  app.selectedChat = chat;
+  app.editMessage = '';
+}
+
+const sendMessage = async () => {
+  const message = app.editMessage;
+  await app.link.sendTxtMsg({
+    txtType: 0,
+    attempt: 1,
+    senderTimestamp: getCurrentTimestamp(),
+    pubKeyPrefix: app.selectedChat.publicKey.substring(0, 12),
+    text: message
+  });
+  app.selectedChat.messages.push({
+    text: message,
+    own: true,
+    timestamp: getCurrentTimestamp()
+  });
+  app.editMessage = '';
+}
+
+onMounted(async () => {
+  refreshPorts();
+});
+
+</script>
+
+<template>
+  <div class="container" v-if="app.selectedChat">
+    <header class="max fixed secondary-container">
+      <nav>
+        <button class="circle transparent" @click="app.selectedChat = null"><i>arrow_back</i></button>
+        <h5 class="max">{{ app.selectedChat.name }}</h5>
+        <button class="circle transparent"><i>more_vert</i></button>
+      </nav>
+    </header>
+    <div class="chat-container">
+      <div class="messages">
+        <p v-for="msg in app.selectedChat.messages" class="round primary-container" :class="msg.own ? 'right secondary' : 'left primary'">{{ msg.text }}</p>
+      </div>
+    </div>
+    <footer>
+      <nav>
+        <div class="field label border max">
+          <input type="text" placeholder=" " @keyup.enter="sendMessage" v-model="app.editMessage"><label>Message</label>
+        </div>
+        <button @click="sendMessage"><i>send</i></button>
+      </nav>
+    </footer>
+  </div>
+  <div v-else class="container">
+    <header class="max fixed secondary-container">
+      <nav>
+        <a class="circle transparent"><i>contacts</i></a>
+        <span class="max">
+          <div v-if="app.serial.connected" class="field label prefix border"><i>person</i><input type="text" placeholder=" " v-model="app.deviceInfo.name" @keyup.enter="saveUserName"><label>User Name</label></div>
+        </span>
+        <a v-if="app.serial.connected" data-ui="#serial-ports-actions" :title="app.serial.selected?.options.path"><i>usb</i>
+          <menu class="left no-wrap" id="serial-ports-actions">
+            <a data-ui="menu-selector" @click="console.log(app.serial)">debug info</a>
+            <a data-ui="menu-selector" @click="disconnectSerial()">disconnect [{{ app.serial.selected?.options.path }}]</a>
+          </menu>
+        </a>
+        <a v-else-if="app.serial.ports?.length" class="circle transparent" data-ui="#serial-ports-connect" @click="refreshPorts" title="Connect to device"><i>usb_off</i>
+          <menu class="left no-wrap" id="serial-ports-connect">
+            <a data-ui="menu-selector" v-for="port in app.serial.ports" @click="connectSerial(port.path)">{{ port.name }}[{{ port.path }}]</a>
+          </menu>
+        </a>
+        <a class="circle transparent"><i>more_vert</i></a>
+      </nav>
+    </header>
+    <article class="border" v-for="contact in app.contacts.list" @click="openChat(contact)">
+        <h6><i class="large">person</i> {{ contact.advName }}</h6>
+        <div><i class="small">key</i> {{ contact.publicKey }}</div>
+    </article>
+  </div>
+</template>
+
+<style>
+html {
+  user-select: none;
+  cursor: default;
+  box-sizing: border-box;
+}
+
+button {
+  cursor: default;
+}
+.container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+.messages {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.messages p {
+  padding: 2px 12px;
+}
+
+.messages p.right {
+  align-self: flex-end;
+}
+.messages p.left {
+  align-self: flex-start;
+}
+
+.send-bottom {
+  display: flex;
+  flex-direction: row;
+}
+.send-bottom div {
+  flex-grow: 1;
+  margin-block-end: 2px;
+}
+</style>

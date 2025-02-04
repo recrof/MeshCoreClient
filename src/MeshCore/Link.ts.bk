@@ -2,14 +2,18 @@ import { SerialPort } from 'tauri-plugin-serialplugin';
 import {
   BleDevice,
   getConnectionUpdates,
+  startScan,
   send,
   read,
+  unsubscribe,
+  subscribe,
+  stopScan,
   connect,
   disconnect,
+  getScanningUpdates,
 } from '@mnlphlp/plugin-blec';
-
 import * as mcf from './Frame.ts';
-import { delay, uint8ArrayToHexPretty } from './Helpers.ts';
+import { delay, uint8ArrayToHex, uint8ArrayToHexPretty } from './Helpers.ts';
 
 interface LinkOptions {
   debug?: boolean;
@@ -51,8 +55,6 @@ export class Link {
   async connectSerial(path: string, baudRate: number): Promise<void> {
     this.linkType = LinkType.Serial;
     this.port = new SerialPort({ path, baudRate });
-    if(!this.port) throw new Error(`Cannot connect to serial ${path}`);
-
     await this.port.open();
     this.isConnected = true;
     this.port.disconnected(() => {
@@ -175,27 +177,28 @@ export class Link {
     await this.expectResponse(mcf.FRespCode.Ok);
   }
 
-  private async read(size?: number): Promise<Uint8Array> {
-    let reply;
+  private async read(size: number): Promise<Uint8Array> {
     if (this.linkType === LinkType.Serial) {
       if(!this.port) throw Error('SerialPort not initialized');
-      console.log(`[serial] request(requested: ${size}, buffer: ${await this.port.bytesToRead()})`);
 
-      reply = await this.port.readBinary({ size, timeout: this.opts.timeout });
+      console.log(`[serial] request(requested: ${size}, buffer: ${await this.port.bytesToRead()})`);
+      if(await this.port.bytesToRead() === 0) console.trace();
+
+      const reply = await this.port.readBinary({ size, timeout: this.opts.timeout });
 
       if (this.opts.debug) {
         console.log('[serial] in: ', uint8ArrayToHexPretty(reply));
       }
+      return reply;
     } else {
       if(!this.bleCharacteristic) throw Error('bleCharacteristic not initialized');
 
-      reply = await read(this.bleCharacteristic);
+      const reply = await read(this.bleCharacteristic);
       if (this.opts.debug) {
         console.log('[ble] in: ', uint8ArrayToHexPretty(reply));
       }
+      return reply.slice(0, size);
     }
-
-    return reply;
   }
 
   private async write(data: Uint8Array): Promise<void> {
@@ -212,77 +215,54 @@ export class Link {
       if (this.opts.debug) {
         console.log('[ble] out:', uint8ArrayToHexPretty(data));
       }
-      await send(this.bleCharacteristic, data, 'withoutResponse');
+      await send(this.bleCharacteristic, data, 'noResponse');
     }
   }
 
-  private async getSerialFrame() {
-    const frameHeader = await this.read(3);
-    if (frameHeader.length === 3) {
-      const header = mcf.SerialFrame.parseHeader(frameHeader);
-      const frameBody = await this.read(header.length);
-      const parsedFrame =  mcf.SerialFrame.parseBody(header, frameBody);
+  private async expectResponse(expectedCode: mcf.FRespCode, timeout: number = 5000): Promise<object | null> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const frameHeader = await this.read(3);
+      if (frameHeader.length === 3) {
+        const header = mcf.SerialFrame.parseHeader(frameHeader);
+        const frameBody = await this.read(header.length);
+        const parsedFrame = mcf.SerialFrame.parseBody(header, frameBody);
+        if (this.opts.debug) {
+          console.debug('expectResponse()', { header, parsedFrame });
+        }
 
-      if (this.opts.debug) {
-        console.debug('getSerialFrame()', { header, parsedFrame });
-      }
-
-      return parsedFrame;
-    }
-
-    throw new Error('Incorrect header size');
-  }
-
-  private async expectResponse(expectedCode: mcf.FRespCode): Promise<object | null> {
-    let parsedFrame;
-    let tries = 0;
-
-    if(this.linkType === LinkType.Serial) {
-      parsedFrame = await this.getSerialFrame() as mcf.frameParserResult;
-    }
-    else {
-      let rawFrame = new Uint8Array();
-      while(tries++ < 4) {
-        rawFrame = await this.read();
-        if(rawFrame.length == 0) {
-          await delay(500);
-          continue;
+        if (parsedFrame && 'code' in parsedFrame && parsedFrame.code === expectedCode) {
+          return parsedFrame;
         }
       }
-      if(rawFrame.length === 0) throw new Error(`Timeout wating for packet with code ${expectedCode}`);
-      parsedFrame = mcf.FrameParser.parse(true, rawFrame) as mcf.frameParserResult;
+      await delay(10); // Prevent too rapid polling
     }
-    if(!parsedFrame) {
-      throw new Error(`Cannot parse frame.`);
-    }
-    if (!(parsedFrame && 'code' in parsedFrame && parsedFrame.code === expectedCode)) {
-      throw new Error(`Expected response code ${expectedCode}, got: ${parsedFrame.code}`);
-    }
-    return parsedFrame;
+    throw new Error(`timeout waiting for response code ${expectedCode}`);
   }
 
   async listenForPushNotifications(): Promise<void> {
     while (this.isConnected) {
       await delay(500); // poll every 500msec
-      let parsedFrame;
-
       try {
-        if (this.linkType === LinkType.Serial) {
-          const bytesToRead = await this.port?.bytesToRead() ?? 0;
+        if (this.linkType === LinkType.Serial && (!this.port || await this.port.bytesToRead() < 3)) continue;
 
-          if(bytesToRead < 3) { continue }
+        const frameHeader = await this.read(3);
+        if (frameHeader.length === 3) {
+          const header = mcf.SerialFrame.parseHeader(frameHeader);
+          if (this.opts.debug) {
+            console.debug('listenForPushNotifications()', { header });
+          }
 
-          console.log('listenForPushNotifications(): got', bytesToRead, 'in queue')
-          parsedFrame = await this.getSerialFrame();
-        }
-        else {
-          const rawFrame = await this.read();
-          if(rawFrame.length === 0) continue;
-          parsedFrame = mcf.FrameParser.parse(true, rawFrame);
-        }
+          const frameBody = await this.read(header.length);
+          const parsedFrame = mcf.SerialFrame.parseBody(header, frameBody);
 
-        if (parsedFrame && 'code' in parsedFrame) {
-          this.triggerPushListeners(parsedFrame.code as number, parsedFrame);
+          if (this.opts.debug) {
+            console.debug('listenForPushNotifications()', { frameBody: uint8ArrayToHex(frameBody), parsedFrame });
+          }
+
+          if (parsedFrame && 'code' in parsedFrame) {
+            this.triggerPushListeners(parsedFrame.code as number, parsedFrame);
+          }
         }
       } catch (error) {
         console.error('Error in push notification listener:', error);

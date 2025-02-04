@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, reactive } from 'vue';
 import { SerialPort } from 'tauri-plugin-serialplugin';
+import { BleDevice, startScan } from '@mnlphlp/plugin-blec';
 
-import { Link, FPushCode } from './MeshCore/Link.ts';
+import { Link, FPushCode, FSelfAdvertType } from './MeshCore/Link.ts';
 
 import 'beercss';
 import 'material-dynamic-colors';
@@ -36,65 +37,30 @@ const getCurrentTimestamp = () => Date.now() / 1000 | 0;
 const app = reactive({
   deviceInfo: {},
   serial: {
-    connected: false,
-    ports: null,
-    selected: null,
+    selected: null ,
   } as SerialState,
   bluetooth: {
-    connected: false,
-    ports: null,
     selected: null,
+    devices: [] as BleDevice[],
+    characteristic: '6E400002-B5A3-F393-E0A9-E50E24DCCA9E',
+    scanning: false,
   },
-  link: null,
-  contacts: {
+  link: new Link({ debug: true, timeout: 500 }),
+  contact: {
     lastSync: 0,
     list: []
   },
-  chats: [] as Chat[],
-  selectedChat: null,
+  chat: {
+    selected: null,
+    list: [] as Chat[]
+  },
   editMessage: '',
-  lastContactRefresh: 0
+  lastContactRefresh: 0,
+  pageSelected: 'contacts'
 });
 
-const connectSerial = async (path: string) => {
-  const port = new SerialPort({
-    path: path,
-    baudRate: 115200
-  });
-  try {
-    await port.open();
-    app.serial.connected = true;
-    port.disconnected(() => {
-      app.serial.selected = null;
-      app.serial.connected = false;
-    });
-  } catch(e) {
-    app.serial.connected = false;
-    throw e;
-  }
-  app.serial.selected = port;
-  await processSerial(port);
-}
 
-const disconnectSerial = async () => {
-  const port = app.serial.selected;
-
-  try {
-    if(!port) throw new Error('already disconnected!');
-    await port.close();
-  }
-  catch(e) {
-    console.error(e);
-  }
-  finally {
-    app.serial.selected = null;
-    app.serial.connected = false;
-  }
-}
-
-const processSerial = async (port: SerialPort) => {
-  const link = app.link = new Link(port, { debug: true, timeout: 2000 });
-
+const initLink = async(link: Link) => {
   link.onPushNotification(FPushCode.Advert, async (data) => {
     console.log('FPushCode.Advert', data);
     await refreshContacts();
@@ -109,28 +75,43 @@ const processSerial = async (port: SerialPort) => {
 
     const message = await link.syncNextMessage();
     if(!message) return;
-    const chat = app.chats.find(chat => chat.publicKey.startsWith(message.pubKeyPrefix));
+    const chat = app.chat.list.find(chat => chat.publicKey.startsWith(message.pubKeyPrefix));
     chat?.messages.push({
       timestamp: message.senderTimestamp,
       text: message.text,
       own: false
     })
-  })
+  });
 
   console.log('app', app);
   const deviceInfo = await link.appStart('MCC', 1);
   delete deviceInfo.code;
   app.deviceInfo = deviceInfo;
-  await link.setDeviceTime(getCurrentTimestamp());
+
+  if(await link.getDeviceTime() < getCurrentTimestamp()) {
+    await link.setDeviceTime(getCurrentTimestamp());
+  };
+
   await link.sendSelfAdvert(1);
-  await refreshContacts()
-}
+
+  await refreshContacts();
+};
+
+const connectSerial = async (port: SerialPort) => {
+  await app.link.connectSerial(port, 115200);
+  await initLink(app.link);
+};
+
+const connectBluetooth = async (device: BleDevice) => {
+  await app.link.connectBluetooth(device, app.bluetooth.characteristic);
+  await initLink(app.link);
+};
 
 const refreshContacts = async () => {
-  app.contacts.list = await link.getContacts(app.lastContactRefresh);
-  for(const contact of app.contacts.list) {
-    if(app.chats.some(chat => chat.publicKey === contact.publicKey)) continue;
-    app.chats.push({
+  app.contact.list = await app.link.getContacts(app.lastContactRefresh);
+  for(const contact of app.contact.list) {
+    if(app.chat.list.some(chat => chat.publicKey === contact.publicKey)) continue;
+    app.chat.list.push({
       updated: 0,
       publicKey: contact.publicKey,
       name: contact.name,
@@ -141,11 +122,10 @@ const refreshContacts = async () => {
 }
 
 const saveUserName = () => {
-  console.log('saveUserName');
   app.link.setAdvertName(app.deviceInfo.name);
 }
 
-const refreshPorts = async () => {
+const refreshSerialPorts = async () => {
   const allPorts = Object.entries(await SerialPort.available_ports());
 
   app.serial.ports = allPorts
@@ -156,10 +136,15 @@ const refreshPorts = async () => {
   console.log(app.serial.ports);
 }
 
+const refreshBluetooth = async() => {
+  startScan((devices: BleDevice[]) => app.bluetooth.devices = devices, 10000);
+}
+
 const openChat = (contact) => {
-  const chat = app.chats.find(chat => chat.publicKey === contact.publicKey);
+  const chat = app.chat.list.find(chat => chat.publicKey === contact.publicKey);
   if(!chat) return;
-  app.selectedChat = chat;
+  app.pageSelected = 'chat';
+  app.chat.selected = chat;
   app.editMessage = '';
 }
 
@@ -169,10 +154,10 @@ const sendMessage = async () => {
     txtType: 0,
     attempt: 1,
     senderTimestamp: getCurrentTimestamp(),
-    pubKeyPrefix: app.selectedChat.publicKey.substring(0, 12),
+    pubKeyPrefix: app.chat.selected.publicKey.substring(0, 12),
     text: message
   });
-  app.selectedChat.messages.push({
+  app.chat.selected.messages.push({
     text: message,
     own: true,
     timestamp: getCurrentTimestamp()
@@ -180,24 +165,29 @@ const sendMessage = async () => {
   app.editMessage = '';
 }
 
+const selfAnnounce = async () => {
+  await app.link.sendSelfAdvert(FSelfAdvertType.Flood);
+}
+
 onMounted(async () => {
-  refreshPorts();
+  refreshSerialPorts();
+  refreshBluetooth();
 });
 
 </script>
 
 <template>
-  <div class="container" v-if="app.selectedChat">
+  <div class="container" v-if="app.pageSelected === 'chat' && app.chat.selected">
     <header class="max fixed secondary-container">
       <nav>
-        <button class="circle transparent" @click="app.selectedChat = null"><i>arrow_back</i></button>
-        <h5 class="max">{{ app.selectedChat.name }}</h5>
+        <button class="circle transparent" @click="app.chat.selected = null"><i>arrow_back</i></button>
+        <h5 class="max">{{ app.chat.selected.name }}</h5>
         <button class="circle transparent"><i>more_vert</i></button>
       </nav>
     </header>
     <div class="chat-container">
       <div class="messages">
-        <p v-for="msg in app.selectedChat.messages" class="round primary-container" :class="msg.own ? 'right secondary' : 'left primary'">{{ msg.text }}</p>
+        <p v-for="msg in app.chat.selected.messages?.toReversed()" class="round primary-container" :class="msg.own ? 'right secondary' : 'left primary'">{{ msg.text }}</p>
       </div>
     </div>
     <footer>
@@ -205,35 +195,64 @@ onMounted(async () => {
         <div class="field label border max">
           <input type="text" placeholder=" " @keyup.enter="sendMessage" v-model="app.editMessage"><label>Message</label>
         </div>
-        <button @click="sendMessage"><i>send</i></button>
+        <button class="circle primary" @click="sendMessage"><i>send</i></button>
       </nav>
     </footer>
   </div>
-  <div v-else class="container">
+  <div v-else-if="app.pageSelected === 'settings'" >
+
+  </div>
+  <div v-else-if="app.pageSelected === 'contacts'" class="container">
     <header class="max fixed secondary-container">
       <nav>
-        <a class="circle transparent"><i>contacts</i></a>
+        <a class="hidden circle transparent"><i>contacts</i></a>
         <span class="max">
           <div v-if="app.serial.connected" class="field label prefix border"><i>person</i><input type="text" placeholder=" " v-model="app.deviceInfo.name" @keyup.enter="saveUserName"><label>User Name</label></div>
         </span>
-        <a v-if="app.serial.connected" data-ui="#serial-ports-actions" :title="app.serial.selected?.options.path"><i>usb</i>
-          <menu class="left no-wrap" id="serial-ports-actions">
-            <a data-ui="menu-selector" @click="console.log(app.serial)">debug info</a>
-            <a data-ui="menu-selector" @click="disconnectSerial()">disconnect [{{ app.serial.selected?.options.path }}]</a>
-          </menu>
-        </a>
-        <a v-else-if="app.serial.ports?.length" class="circle transparent" data-ui="#serial-ports-connect" @click="refreshPorts" title="Connect to device"><i>usb_off</i>
-          <menu class="left no-wrap" id="serial-ports-connect">
-            <a data-ui="menu-selector" v-for="port in app.serial.ports" @click="connectSerial(port.path)">{{ port.name }}[{{ port.path }}]</a>
-          </menu>
-        </a>
-        <a class="circle transparent"><i>more_vert</i></a>
+        <template v-if="app.serial.connected">
+          <a class="circle transparent" name="Flood announce" @click="selfAnnounce()"><i>cell_tower</i></a>
+          <a data-ui="#serial-ports-actions" :title="app.serial.selected?.options.path">
+            <i>usb</i>
+            <menu class="left no-wrap" id="serial-ports-actions">
+              <a data-ui="menu-selector" @click="console.log(app.serial)">debug info</a>
+              <a data-ui="menu-selector" @click="disconnectSerial()">disconnect [{{ app.serial.selected?.options.path }}]</a>
+            </menu>
+          </a>
+        </template>
+        <template v-else-if="app.serial.ports?.length">
+          <a class="circle transparent" data-ui="#serial-ports-connect" @click="refreshSerialPorts" title="Connect to device">
+            <i>usb_off</i>
+            <menu class="left no-wrap" id="serial-ports-connect">
+              <a data-ui="menu-selector" v-for="port in app.serial.ports" @click="connectSerial(port.path)">{{ port.name }}[{{ port.path }}]</a>
+            </menu>
+          </a>
+        </template>
+        <template v-if="app.bluetooth?.selected?.isConnected">
+          <a  data-ui="#bluetooth-ports-actions" :title="app.bluetooth.selected?.name">
+            <i>bluetooth_connected</i>
+            <menu class="left no-wrap" id="bluetooth-ports-actions">
+              <a data-ui="menu-selector" @click="console.log(app.bluetooth)">debug info</a>
+              <a data-ui="menu-selector" @click="disconnectBluetooth()">disconnect [{{ app.bluetooth.selected?.name }}]</a>
+            </menu>
+          </a>
+        </template>
+        <template v-else-if="app.bluetooth.devices?.length">
+          <a class="circle transparent" data-ui="#bluetooth-ports-connect" @click="refreshBluetooth" title="Connect to device">
+            <i>bluetooth</i>
+            <menu class="left no-wrap" id="bluetooth-ports-connect">
+              <a data-ui="menu-selector" v-for="device in app.bluetooth.devices" @click="connectBluetooth(device)">{{ device.name }}[{{ device.address }}]</a>
+            </menu>
+          </a>
+        </template>
+        <a class="hidden circle transparent"><i>more_vert</i></a>
       </nav>
     </header>
-    <article class="border" v-for="contact in app.contacts.list" @click="openChat(contact)">
-        <h6><i class="large">person</i> {{ contact.advName }}</h6>
-        <div><i class="small">key</i> {{ contact.publicKey }}</div>
-    </article>
+    <div class="contacts">
+      <article class="contact border" v-for="contact in app.contact.list" @click="openChat(contact)">
+          <h6><i class="large">person</i> {{ contact.advName }}</h6>
+          <p><i class="small">key</i> {{ contact.publicKey }}</p>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -247,6 +266,9 @@ html {
 button {
   cursor: default;
 }
+.hidden {
+  display: none;
+}
 .container {
   height: 100vh;
   display: flex;
@@ -257,10 +279,20 @@ button {
   flex-direction: column;
   flex-grow: 1;
 }
+.contacts {
+  padding: 5px;
+}
+.contacts article p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: keep-all;
+  max-width: 100%;
+}
 .messages {
   flex-grow: 1;
   display: flex;
   flex-direction: column-reverse;
+  padding: 5px;
 }
 .messages p {
   padding: 2px 12px;
@@ -273,12 +305,4 @@ button {
   align-self: flex-start;
 }
 
-.send-bottom {
-  display: flex;
-  flex-direction: row;
-}
-.send-bottom div {
-  flex-grow: 1;
-  margin-block-end: 2px;
-}
 </style>
