@@ -1,19 +1,19 @@
-import { uint8ArrayConcat, uint8ArrayToHex, hexToUint8Array } from "./Helpers.ts";
+import { uint8ArrayConcat, uint8ArrayToHex, hexToUint8Array } from "./Helpers";
 
-export const FPathLenDirect = 0xff;
+export const PathLenDirect = 0xff;
 
-export enum FTxtType {
+export enum TxtType {
   plain = 0,
   cliData = 1,
   signedPlain = 2,
 }
 
-export enum FRespCodeType {
+export enum RespCodeType {
   direct = 0,
   flood = 1
 }
 
-export enum FCmdCode {
+export enum CmdCode {
   AppStart = 1,
   SendTxtMsg = 2,
   SendChannelTxtMsg = 3,
@@ -28,7 +28,7 @@ export enum FCmdCode {
   SetTxPower = 12,
 }
 
-export enum FRespCode {
+export enum RespCode {
   Ok = 0,
   Err = 1,
   ContactsStart = 2,
@@ -38,28 +38,30 @@ export enum FRespCode {
   Sent = 6,
   ContactMsgRecv = 7,
   ChannelMsgRecv = 8,
+  CurrTime = 9,
+  NoMoreMessages = 10
 }
 
-export enum FPushCode {
+export enum PushCode {
   Advert = 0x80,
   PathUpdated = 0x81,
   SendConfirmed = 0x82,
   MsgWaiting = 0x83,
 }
 
-export enum FAdvType {
+export enum AdvType {
   None = 0,
   Chat = 1,
   Repeater = 2,
   Room = 3,
 }
 
-export enum FSelfAdvertType {
+export enum SelfAdvertType {
   ZeroHop = 0,
   Flood = 1,
 }
 
-enum FrameFieldType {
+enum FieldType {
   uint = 'Uint',
   int = 'Int',
   float = 'Float',
@@ -78,7 +80,7 @@ export interface frameParserResult {
 interface FrameField {
   key?: string,
   value?: string | number | Uint8Array | null | undefined,
-  type: FrameFieldType,
+  type: FieldType,
   size?: number, // varchar, bin, hex fields don't need size defined
   optional?: boolean, // if we hit this field, and value is null or undefined, we skip it.
   set?(...args: any): any,
@@ -149,13 +151,13 @@ export abstract class Frame {
       }
 
       // 2. Handle different field types:
-      if (field.type === FrameFieldType.bin && value instanceof Uint8Array) {
+      if (field.type === FieldType.bin && value instanceof Uint8Array) {
         frameParts.push(value);
-      } else if (field.type === FrameFieldType.string) {
+      } else if (field.type === FieldType.string) {
         frameParts.push(textEncoder.encode(value.toString()));
-      } else if (field.type === FrameFieldType.hexString && typeof value === 'string') {
+      } else if (field.type === FieldType.hexString && typeof value === 'string') {
         frameParts.push(hexToUint8Array(value, field.size));
-      } else if (field.type === FrameFieldType.cString) {
+      } else if (field.type === FieldType.cString) {
         const binString = textEncoder.encode(value.toString());
         if (!field.size) {
           throw new Error("Size is required for cString type");
@@ -211,13 +213,13 @@ export abstract class Frame {
 
       // Handle fields without a key (reserved space)
       if (field.key == null) {
-        if (field.type === FrameFieldType.bin) {
+        if (field.type === FieldType.bin) {
           if(!(field.value instanceof Uint8Array && field.value.length > 0)) {
             throw new Error(`Keyless field of type 'bin' needs to have value type of Uint8Array and non-zero length`);
           }
           index += field.value.length
         }
-        if (field.type === FrameFieldType.uint) {
+        if (field.type === FieldType.uint) {
           if(!(field.size && typeof field.value === 'number')) {
             throw new Error(`Keyless field of type 'uint' needs to have numeric value and non-zero size`);
           }
@@ -227,7 +229,7 @@ export abstract class Frame {
       }
 
       // Fixed size fields
-      if (field.type !== FrameFieldType.string && field.size != null) {
+      if (field.type !== FieldType.string && field.size != null) {
         if (field.optional && index + field.size > rawFrame.length) {
           // Skip optional field if not enough data is available
           continue;
@@ -237,11 +239,11 @@ export abstract class Frame {
           throw new Error(`Frame too short for field ${field.key}`);
         }
 
-        if (field.type === FrameFieldType.bin) {
+        if (field.type === FieldType.bin) {
           resultParams[field.key] = rawFrame.slice(index, index + field.size);
-        } else if (field.type === FrameFieldType.hexString) {
+        } else if (field.type === FieldType.hexString) {
           resultParams[field.key] = uint8ArrayToHex(rawFrame.slice(index, index + field.size));
-        } else if (field.type === FrameFieldType.cString) {
+        } else if (field.type === FieldType.cString) {
           const end = rawFrame.indexOf(0, index);
           if (end === -1) {
             throw new Error(`Unterminated C string for field ${field.key}`);
@@ -267,7 +269,7 @@ export abstract class Frame {
       }
 
       // Variable length string, must be the last field
-      else if (field.type === FrameFieldType.string) {
+      else if (field.type === FieldType.string) {
         if (i !== this.fields.length - 1) {
           throw new Error('String type fields must be the last field');
         }
@@ -289,17 +291,17 @@ export abstract class Frame {
     app_name: (v: number)archar   // remainder of frame
   }
 */
-export interface ICmdAppStart {
+export interface ParamsAppStart {
   appVer: number,
   appName: string,
 }
-export class FCmdAppStart extends Frame {
-  constructor(paramsOrUint8Array: ICmdAppStart | Uint8Array, opts?: FrameOptions) {
+export class CmdAppStart extends Frame {
+  constructor(paramsOrUint8Array: ParamsAppStart | Uint8Array, opts?: FrameOptions) {
         const fields = [
-        { value: FCmdCode.AppStart, size: 1, type: FrameFieldType.uint },
-        { key: 'appVer', size: 1, type: FrameFieldType.uint },
-        { value: new Uint8Array(6), type: FrameFieldType.bin },
-        { key: 'appName', type: FrameFieldType.string }
+        { value: CmdCode.AppStart, size: 1, type: FieldType.uint },
+        { key: 'appVer', size: 1, type: FieldType.uint },
+        { value: new Uint8Array(6), type: FieldType.bin },
+        { key: 'appName', type: FieldType.string }
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -311,14 +313,14 @@ export class FCmdAppStart extends Frame {
     (optional) since: uint32,   // the last contact.lastmod value already received
   }
 */
-export interface ICmdGetContacts {
+export interface ParamsGetContacts {
   since?: number
 }
-export class FCmdGetContacts extends Frame {
-  constructor(paramsOrUint8Array: ICmdGetContacts | Uint8Array, opts?: FrameOptions) {
+export class CmdGetContacts extends Frame {
+  constructor(paramsOrUint8Array: ParamsGetContacts | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.GetContacts, size: 1, type: FrameFieldType.uint },
-      { key: 'since', size: 4, type: FrameFieldType.uint, optional: true },
+      { value: CmdCode.GetContacts, size: 1, type: FieldType.uint },
+      { key: 'since', size: 4, type: FieldType.uint, optional: true },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -338,9 +340,9 @@ export class FCmdGetContacts extends Frame {
     (optional) adv_lon: int32,    // advertised longitude * 1E6
   }
 */
-export interface ICmdAddUpdateContact {
+export interface ParamsAddUpdateContact {
   publicKey: string,
-  type: FAdvType,
+  type: AdvType,
   flags: number,
   outPathLen: number,
   outPath: Uint8Array,
@@ -349,19 +351,19 @@ export interface ICmdAddUpdateContact {
   advLat?: number,
   advLon?: number
 }
-export class FCmdAddUpdateContact extends Frame {
-  constructor(paramsOrUint8Array: ICmdAddUpdateContact | Uint8Array, opts?: FrameOptions) {
+export class CmdAddUpdateContact extends Frame {
+  constructor(paramsOrUint8Array: ParamsAddUpdateContact | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.AddUpdateContact, size: 1, type: FrameFieldType.uint },
-      { key: 'publicKey', type: FrameFieldType.hexString, size: 32 },
-      { key: 'type', size: 1, type: FrameFieldType.uint },
-      { key: 'flags', size: 1, type: FrameFieldType.uint },
-      { key: 'outPathLen', size: 1, type: FrameFieldType.int },
-      { key: 'outPath', size: 64, type: FrameFieldType.bin },
-      { key: 'advName', size: 32, type: FrameFieldType.cString },
-      { key: 'lastAdvert', size: 4, type: FrameFieldType.uint },
-      { key: 'advLat', size: 4, type: FrameFieldType.int, optional: true, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
-      { key: 'advLon', size: 4, type: FrameFieldType.int, optional: true, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
+      { value: CmdCode.AddUpdateContact, size: 1, type: FieldType.uint },
+      { key: 'publicKey', type: FieldType.hexString, size: 32 },
+      { key: 'type', size: 1, type: FieldType.uint },
+      { key: 'flags', size: 1, type: FieldType.uint },
+      { key: 'outPathLen', size: 1, type: FieldType.int },
+      { key: 'outPath', size: 64, type: FieldType.bin },
+      { key: 'advName', size: 32, type: FieldType.cString },
+      { key: 'lastAdvert', size: 4, type: FieldType.uint },
+      { key: 'advLat', size: 4, type: FieldType.int, optional: true, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
+      { key: 'advLon', size: 4, type: FieldType.int, optional: true, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -372,10 +374,10 @@ export class FCmdAddUpdateContact extends Frame {
     code: byte,   // constant 5
   }
 */
-export class FCmdGetDeviceTime extends Frame {
+export class CmdGetDeviceTime extends Frame {
   constructor(opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.GetDeviceTime, size: 1, type: FrameFieldType.uint },
+      { value: CmdCode.GetDeviceTime, size: 1, type: FieldType.uint },
     ];
     super({}, fields, opts);
   }
@@ -387,14 +389,14 @@ export class FCmdGetDeviceTime extends Frame {
     epoch_secs: uint32
   }
 */
-export interface ICmdSetDeviceTime {
+export interface ParamsSetDeviceTime {
   epochSecs: number
 }
-export class FCmdSetDeviceTime extends Frame {
-  constructor(paramsOrUint8Array: ICmdSetDeviceTime | Uint8Array, opts?: FrameOptions) {
+export class CmdSetDeviceTime extends Frame {
+  constructor(paramsOrUint8Array: ParamsSetDeviceTime | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SetDeviceTime, size: 1, type: FrameFieldType.uint },
-      { key: 'epochSecs', size: 4, type: FrameFieldType.uint },
+      { value: CmdCode.SetDeviceTime, size: 1, type: FieldType.uint },
+      { key: 'epochSecs', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -406,14 +408,14 @@ export class FCmdSetDeviceTime extends Frame {
     (optional) type: byte,   // 1 = flood, 0 = zero-hop (default)
   }
 */
-export interface ICmdSendSelfAdvert {
-  type?: FSelfAdvertType
+export interface ParamsSendSelfAdvert {
+  type?: SelfAdvertType
 }
-export class FCmdSendSelfAdvert extends Frame {
-  constructor(paramsOrUint8Array: ICmdSendSelfAdvert | Uint8Array, opts?: FrameOptions) {
+export class CmdSendSelfAdvert extends Frame {
+  constructor(paramsOrUint8Array: ParamsSendSelfAdvert | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SendSelfAdvert, size: 1, type: FrameFieldType.uint },
-      { key: 'type', size: 1, type: FrameFieldType.uint, optional: true },
+      { value: CmdCode.SendSelfAdvert, size: 1, type: FieldType.uint },
+      { key: 'type', size: 1, type: FieldType.uint, optional: true },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -425,14 +427,14 @@ export class FCmdSendSelfAdvert extends Frame {
     name: (v: number)archar   // remainder of frame
   }
 */
-export interface ICmdSetAdvertName {
+export interface ParamsSetAdvertName {
   name: string
 }
-export class FCmdSetAdvertName extends Frame {
-  constructor(paramsOrUint8Array: ICmdSetAdvertName | Uint8Array, opts?: FrameOptions) {
+export class CmdSetAdvertName extends Frame {
+  constructor(paramsOrUint8Array: ParamsSetAdvertName | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SetAdvertName, size: 1, type: FrameFieldType.uint },
-      { key: 'name', type: FrameFieldType.string },
+      { value: CmdCode.SetAdvertName, size: 1, type: FieldType.uint },
+      { key: 'name', type: FieldType.string },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -448,33 +450,80 @@ export class FCmdSetAdvertName extends Frame {
     text: (v: number)archar    // remainder of frame
   }
 */
-export interface ICmdSendTxtMsg {
-  txtType: FTxtType,
+export interface ParamsSendTxtMsg {
+  txtType: TxtType,
   attempt: number,
   senderTimestamp: number,
   pubKeyPrefix: string,
   text: string
 }
-export class FCmdSendTxtMsg extends Frame {
-  constructor(paramsOrUint8Array: ICmdSendTxtMsg | Uint8Array, opts?: FrameOptions) {
+export class CmdSendTxtMsg extends Frame {
+  constructor(paramsOrUint8Array: ParamsSendTxtMsg | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SendTxtMsg, size: 1, type: FrameFieldType.uint },
-      { key: 'txtType', size: 1, type: FrameFieldType.uint },
-      { key: 'attempt', size: 1, type: FrameFieldType.uint },
-      { key: 'senderTimestamp', size: 4, type: FrameFieldType.uint },
-      { key: 'pubKeyPrefix', size: 6, type: FrameFieldType.hexString },
-      { key: 'text', type: FrameFieldType.string },
+      { value: CmdCode.SendTxtMsg, size: 1, type: FieldType.uint },
+      { key: 'txtType', size: 1, type: FieldType.uint },
+      { key: 'attempt', size: 1, type: FieldType.uint },
+      { key: 'senderTimestamp', size: 4, type: FieldType.uint },
+      { key: 'pubKeyPrefix', size: 6, type: FieldType.hexString },
+      { key: 'text', type: FieldType.string },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
-export class FCmdSyncNextMessage extends Frame {
+export class CmdSyncNextMessage extends Frame {
   constructor(paramsOrUint8Array?: Uint8Array | null, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SyncNextMessage, size: 1, type: FrameFieldType.uint },
+      { value: CmdCode.SyncNextMessage, size: 1, type: FieldType.uint },
     ];
     super(paramsOrUint8Array ?? {}, fields, opts);
+  }
+}
+
+/*
+  CMD_SET_RADIO_PARAMS {
+  code: byte,   // constant 11
+  radio_freq: uint32,    // freq * 1000
+  radio_bw: uint32,      // bandwidth(khz) * 1000
+  radio_sf: byte,        // spreading factor
+  radio_cr: byte         // coding rate
+}
+*/
+export interface ParamsSetRadioParams {
+  radioFreq: number,
+  radioBw: number,
+  radioSf: number,
+  radioCr: number
+}
+
+export class CmdSetRadioParams extends Frame {
+  constructor(paramsOrUint8Array: ParamsSetRadioParams | Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: CmdCode.SetRadioParams, size: 1, type: FieldType.uint },
+      { key: 'radioFreq', size: 4, type: FieldType.uint },
+      { key: 'radioBw', size: 4, type: FieldType.uint },
+      { key: 'radioSf', size: 1, type: FieldType.uint },
+      { key: 'radioCr', size: 1, type: FieldType.uint },
+    ];
+    super(paramsOrUint8Array, fields, opts);
+  }
+}
+/*
+  CMD_SET_RADIO_TX_POWER {
+    code: byte,   // constant 12
+    tx_power_dbm: byte    // TX power, in dBm
+  }
+*/
+export interface ParamsSetRadioTxPower {
+  txPower: number
+}
+export class CmdSetRadioTxPower extends Frame {
+  constructor(paramsOrUint8Array: ParamsSetRadioTxPower | Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: CmdCode.SetTxPower, size: 1, type: FieldType.uint },
+      { key: 'txPower', size: 1, type: FieldType.uint },
+    ];
+    super(paramsOrUint8Array, fields, opts);
   }
 }
 
@@ -493,8 +542,8 @@ export class FCmdSyncNextMessage extends Frame {
     name: (v: number)archar   // remainder of frame
   }
 */
-export interface IRespCodeSelfInfo {
-  type: FAdvType,
+export interface ParamsRespSelfInfo {
+  type: AdvType,
   txPower: number,
   maxTxPower: number,
   publicKey: string,
@@ -505,20 +554,20 @@ export interface IRespCodeSelfInfo {
   radioCr: number,
   name: string
 }
-export class FRespCodeSelfInfo extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeSelfInfo | Uint8Array, opts?: FrameOptions) {
+export class RespSelfInfo extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespSelfInfo | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.SelfInfo, size: 1, type: FrameFieldType.uint },
-      { key: 'type', size: 1, type: FrameFieldType.uint },
-      { key: 'txPower', size: 1, type: FrameFieldType.uint },
-      { key: 'maxTxPower', size: 1, type: FrameFieldType.uint },
-      { key: 'publicKey', size: 32, type: FrameFieldType.hexString},
-      { key: 'deviceLoc', size: 12, type: FrameFieldType.bin},
-      { key: 'radioFreq', size: 4, type: FrameFieldType.uint },
-      { key: 'radioBw', size: 4, type: FrameFieldType.uint },
-      { key: 'radioSf', size: 1, type: FrameFieldType.uint },
-      { key: 'radioCr', size: 1, type: FrameFieldType.uint },
-      { key: 'name', type: FrameFieldType.string},
+      { value: RespCode.SelfInfo, size: 1, type: FieldType.uint },
+      { key: 'type', size: 1, type: FieldType.uint },
+      { key: 'txPower', size: 1, type: FieldType.uint },
+      { key: 'maxTxPower', size: 1, type: FieldType.uint },
+      { key: 'publicKey', size: 32, type: FieldType.hexString},
+      { key: 'deviceLoc', size: 12, type: FieldType.bin},
+      { key: 'radioFreq', size: 4, type: FieldType.uint },
+      { key: 'radioBw', size: 4, type: FieldType.uint },
+      { key: 'radioSf', size: 1, type: FieldType.uint },
+      { key: 'radioCr', size: 1, type: FieldType.uint },
+      { key: 'name', type: FieldType.string},
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -530,14 +579,14 @@ export class FRespCodeSelfInfo extends Frame {
     count: uint32    // total number of contacts
   }
 */
-export interface IRespCodeContactsStart {
+export interface ParamsRespContactsStart {
   count: number
 }
-export class FRespCodeContactsStart extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeContactsStart | Uint8Array, opts?: FrameOptions) {
+export class RespContactsStart extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespContactsStart | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.ContactsStart, size: 1, type: FrameFieldType.uint },
-      { key: 'count', size: 4, type: FrameFieldType.uint },
+      { value: RespCode.ContactsStart, size: 1, type: FieldType.uint },
+      { key: 'count', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -558,9 +607,9 @@ export class FRespCodeContactsStart extends Frame {
     lastmod: uint32     // used for next 'since' param to CMD_GET_CONTACTS
   }
 */
-export interface IRespCodeContact {
+export interface ParamsRespContact {
   publicKey: string,
-  type: FAdvType,
+  type: AdvType,
   flags: number,
   outPathLen: number,
   outPath: Uint8Array,
@@ -570,20 +619,20 @@ export interface IRespCodeContact {
   advLon: number,
   lastMod: number,
 }
-export class FRespCodeContact extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeContact | Uint8Array, opts?: FrameOptions) {
+export class RespContact extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespContact | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.Contact, size: 1, type: FrameFieldType.uint },
-      { key: 'publicKey', size: 32, type: FrameFieldType.hexString},
-      { key: 'type', size: 1, type: FrameFieldType.uint },
-      { key: 'flags', size: 1, type: FrameFieldType.uint },
-      { key: 'outPathLen', size: 1, type: FrameFieldType.int },
-      { key: 'outPath', size: 64, type: FrameFieldType.bin },
-      { key: 'advName', size: 32, type: FrameFieldType.cString },
-      { key: 'lastAdvert', size: 4, type: FrameFieldType.uint },
-      { key: 'advLat', size: 4, type: FrameFieldType.int, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
-      { key: 'advLon', size: 4, type: FrameFieldType.int, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
-      { key: 'lastMod', size: 4, type: FrameFieldType.uint },
+      { value: RespCode.Contact, size: 1, type: FieldType.uint },
+      { key: 'publicKey', size: 32, type: FieldType.hexString},
+      { key: 'type', size: 1, type: FieldType.uint },
+      { key: 'flags', size: 1, type: FieldType.uint },
+      { key: 'outPathLen', size: 1, type: FieldType.int },
+      { key: 'outPath', size: 64, type: FieldType.bin },
+      { key: 'advName', size: 32, type: FieldType.cString },
+      { key: 'lastAdvert', size: 4, type: FieldType.uint },
+      { key: 'advLat', size: 4, type: FieldType.int, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
+      { key: 'advLon', size: 4, type: FieldType.int, get: (v: number) => v * 1e-6, set: (v: number) => v * 1e6 },
+      { key: 'lastMod', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -596,14 +645,14 @@ export class FRespCodeContact extends Frame {
 }
 */
 
-interface IRespCodeEndOfContacts {
+interface ParamsRespEndOfContacts {
   mostRecentLastmod: number
 }
-export class FRespCodeEndOfContacts extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeEndOfContacts | Uint8Array, opts?: FrameOptions) {
+export class RespEndOfContacts extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespEndOfContacts | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.EndOfContacts, size: 1, type: FrameFieldType.uint },
-      { key: 'mostRecentLastmod', size: 4, type: FrameFieldType.uint },
+      { value: RespCode.EndOfContacts, size: 1, type: FieldType.uint },
+      { key: 'mostRecentLastmod', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -617,18 +666,18 @@ export class FRespCodeEndOfContacts extends Frame {
     suggested_timeout: uint32   // estimated round-trip timeout, in milliseconds
   }
 */
-export interface IRespCodeSent {
-  type: FRespCodeType,
+export interface ParamsRespSent {
+  type: RespCodeType,
   expectedAckCode: number,
   suggestedTimeout: number
 }
-export class FRespCodeSent extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeSent | Uint8Array, opts?: FrameOptions) {
+export class RespSent extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespSent | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.Sent, size: 1, type: FrameFieldType.uint },
-      { key: 'type', size: 1, type: FrameFieldType.uint },
-      { key: 'expectedAckCode', size: 4, type: FrameFieldType.uint },
-      { key: 'suggestedTimeout', size: 4, type: FrameFieldType.uint },
+      { value: RespCode.Sent, size: 1, type: FieldType.uint },
+      { key: 'type', size: 1, type: FieldType.uint },
+      { key: 'expectedAckCode', size: 4, type: FieldType.uint },
+      { key: 'suggestedTimeout', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
@@ -644,142 +693,118 @@ export class FRespCodeSent extends Frame {
     text: (v: number)archar    // remainder of frame
   }
 */
-export interface IRespContactMsgRecv {
+export interface ParamsContactMsgRecv {
   pubKeyPrefix: string,
   pathLen: number,
-  txtType: FTxtType,
+  txtType: TxtType,
   senderTimestamp: number,
   text: string,
 }
-export class FRespContactMsgRecv extends Frame {
-  constructor(paramsOrUint8Array: IRespContactMsgRecv | Uint8Array, opts?: FrameOptions) {
+export class RespContactMsgRecv extends Frame {
+  constructor(paramsOrUint8Array: ParamsContactMsgRecv | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.ContactMsgRecv, size: 1, type: FrameFieldType.uint },
-      { key: 'pubKeyPrefix', size: 6, type: FrameFieldType.hexString },
-      { key: 'pathLen', size: 1, type: FrameFieldType.uint },
-      { key: 'txtType', size: 1, type: FrameFieldType.uint },
-      { key: 'senderTimestamp', size: 4, type: FrameFieldType.uint },
-      { key: 'text', type: FrameFieldType.string },
+      { value: RespCode.ContactMsgRecv, size: 1, type: FieldType.uint },
+      { key: 'pubKeyPrefix', size: 6, type: FieldType.hexString },
+      { key: 'pathLen', size: 1, type: FieldType.uint },
+      { key: 'txtType', size: 1, type: FieldType.uint },
+      { key: 'senderTimestamp', size: 4, type: FieldType.uint },
+      { key: 'text', type: FieldType.string },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
 /*
-  CMD_SET_RADIO_PARAMS {
-  code: byte,   // constant 11
-  radio_freq: uint32,    // freq * 1000
-  radio_bw: uint32,      // bandwidth(khz) * 1000
-  radio_sf: byte,        // spreading factor
-  radio_cr: byte         // coding rate
-}
-*/
-export interface ICmdSetRadioParams {
-  radioFreq: number,
-  radioBw: number,
-  radioSf: number,
-  radioCr: number
-}
-
-export class FCmdSetRadioParams extends Frame {
-  constructor(paramsOrUint8Array: ICmdSetRadioParams | Uint8Array, opts?: FrameOptions) {
-    const fields = [
-      { value: FCmdCode.SetRadioParams, size: 1, type: FrameFieldType.uint },
-      { key: 'radioFreq', size: 4, type: FrameFieldType.uint },
-      { key: 'radioBw', size: 4, type: FrameFieldType.uint },
-      { key: 'radioSf', size: 1, type: FrameFieldType.uint },
-      { key: 'radioCr', size: 1, type: FrameFieldType.uint },
-    ];
-    super(paramsOrUint8Array, fields, opts);
-  }
-}
-
-/*
-  CMD_SET_RADIO_TX_POWER {
-    code: byte,   // constant 12
-    tx_power_dbm: byte    // TX power, in dBm
+  RESP_CODE_CONTACTS_START {
+    code: byte,   // constant 2
+    count: uint32    // total number of contacts
   }
 */
-export interface ICmdSetRadioTxPower {
-  txPower: number
+export interface ParamsRespCurrTime {
+  epochSecs: number
 }
-export class FCmdSetRadioTxPower extends Frame {
-  constructor(paramsOrUint8Array: ICmdSetRadioTxPower | Uint8Array, opts?: FrameOptions) {
+export class RespCurrTime extends Frame {
+  constructor(paramsOrUint8Array: ParamsRespCurrTime | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FCmdCode.SetTxPower, size: 1, type: FrameFieldType.uint },
-      { key: 'txPower', size: 1, type: FrameFieldType.uint },
+      { value: RespCode.CurrTime, size: 1, type: FieldType.uint },
+      { key: 'epochSecs', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
-export interface IRespCodeOk {
-  epochSecs?: number
-}
-export class FRespCodeOk extends Frame {
-  constructor(paramsOrUint8Array: IRespCodeOk | Uint8Array, opts?: FrameOptions) {
-    const fields = [
-      { value: FRespCode.Ok, size: 1, type: FrameFieldType.uint },
-      { key: 'epochSecs', size: 4, type: FrameFieldType.uint, optional: true },
-    ];
-    super(paramsOrUint8Array, fields, opts);
-  }
-}
-
-export class FRespCodeErr extends Frame {
+export class RespNoMoreMessages extends Frame {
   constructor(uint8Array?: Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FRespCode.Err, size: 1, type: FrameFieldType.uint },
+      { value: RespCode.NoMoreMessages, size: 1, type: FieldType.uint },
     ];
     super(uint8Array ?? {}, fields, opts);
   }
 }
 
-export interface IPushAdvert {
+export class RespOk extends Frame {
+  constructor(uint8Array?: Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: RespCode.Ok, size: 1, type: FieldType.uint },
+    ];
+    super(uint8Array ?? {}, fields, opts);
+  }
+}
+
+export class RespErr extends Frame {
+  constructor(uint8Array?: Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: RespCode.Err, size: 1, type: FieldType.uint },
+    ];
+    super(uint8Array ?? {}, fields, opts);
+  }
+}
+
+export interface ParamsPushAdvert {
   publicKey: string
 }
-export class FPushAdvert extends Frame {
-  constructor(paramsOrUint8Array: IPushAdvert | Uint8Array, opts?: FrameOptions) {
+export class PushAdvert extends Frame {
+  constructor(paramsOrUint8Array: ParamsPushAdvert | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FPushCode.Advert, size: 1, type: FrameFieldType.uint },
-      { key: 'publicKey', type: FrameFieldType.hexString, size: 32 },
+      { value: PushCode.Advert, size: 1, type: FieldType.uint },
+      { key: 'publicKey', type: FieldType.hexString, size: 32 },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
-export interface IPushPathUpdated {
+export interface ParamsPushPathUpdated {
   publicKey: string
 }
-export class FPushPathUpdated extends Frame {
-  constructor(paramsOrUint8Array: IPushPathUpdated | Uint8Array, opts?: FrameOptions) {
+export class PushPathUpdated extends Frame {
+  constructor(paramsOrUint8Array: ParamsPushPathUpdated | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FPushCode.PathUpdated, size: 1, type: FrameFieldType.uint },
-      { key: 'publicKey', type: FrameFieldType.hexString, size: 32 },
+      { value: PushCode.PathUpdated, size: 1, type: FieldType.uint },
+      { key: 'publicKey', type: FieldType.hexString, size: 32 },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
-export interface IPushSendConfirmed {
+export interface ParamsPushSendConfirmed {
   ackCode: string,
   roundTrip: number,
 }
-export class FPushSendConfirmed extends Frame {
-  constructor(paramsOrUint8Array: IPushSendConfirmed | Uint8Array, opts?: FrameOptions) {
+export class PushSendConfirmed extends Frame {
+  constructor(paramsOrUint8Array: ParamsPushSendConfirmed | Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FPushCode.SendConfirmed, size: 1, type: FrameFieldType.uint },
-      { key: 'ackCode', type: FrameFieldType.hexString, size: 4 },
-      { key: 'roundTrip', type: FrameFieldType.uint, size: 4 },
+      { value: PushCode.SendConfirmed, size: 1, type: FieldType.uint },
+      { key: 'ackCode', type: FieldType.hexString, size: 4 },
+      { key: 'roundTrip', type: FieldType.uint, size: 4 },
     ];
     super(paramsOrUint8Array, fields, opts);
   }
 }
 
-export class FPushMsgWaiting extends Frame {
+export class PushMsgWaiting extends Frame {
   constructor(uint8Array?: Uint8Array, opts?: FrameOptions) {
     const fields = [
-      { value: FPushCode.MsgWaiting, size: 1, type: FrameFieldType.uint },
+      { value: PushCode.MsgWaiting, size: 1, type: FieldType.uint },
     ];
     super(uint8Array ?? {}, fields, opts);
   }
@@ -801,42 +826,45 @@ interface SerialFrameHeader {
 export class FrameParser {
   static parse(isReply: boolean, frame: Uint8Array): frameParserResult {
     const frameCode = frame[0];
-    console.log(frameCode, typeof frameCode);
     if(isReply) {
       switch (frameCode) {
         // push codes
-        case FPushCode.Advert: return new FPushAdvert(frame).parse();
-        case FPushCode.PathUpdated: return new FPushPathUpdated(frame).parse();
-        case FPushCode.SendConfirmed: return new FPushSendConfirmed(frame).parse();
-        case FPushCode.MsgWaiting: return new FPushMsgWaiting(frame).parse();
+        case PushCode.Advert: return new PushAdvert(frame).parse();
+        case PushCode.PathUpdated: return new PushPathUpdated(frame).parse();
+        case PushCode.SendConfirmed: return new PushSendConfirmed(frame).parse();
+        case PushCode.MsgWaiting: return new PushMsgWaiting(frame).parse();
 
         // command responses
-        case FRespCode.SelfInfo: return new FRespCodeSelfInfo(frame).parse();
-        case FRespCode.ContactsStart: return new FRespCodeContactsStart(frame).parse();
-        case FRespCode.Contact: return new FRespCodeContact(frame).parse();
-        case FRespCode.EndOfContacts: return new FRespCodeEndOfContacts(frame).parse();
-        case FRespCode.Sent: return new FRespCodeSent(frame).parse();
-        case FRespCode.ContactMsgRecv: return new FRespContactMsgRecv(frame).parse();
-        case FRespCode.Ok: return new FRespCodeOk(frame).parse();
-        case FRespCode.Err: return new FRespCodeErr(frame).parse();
+        case RespCode.SelfInfo: return new RespSelfInfo(frame).parse();
+        case RespCode.ContactsStart: return new RespContactsStart(frame).parse();
+        case RespCode.Contact: return new RespContact(frame).parse();
+        case RespCode.EndOfContacts: return new RespEndOfContacts(frame).parse();
+        case RespCode.Sent: return new RespSent(frame).parse();
+        case RespCode.ContactMsgRecv: return new RespContactMsgRecv(frame).parse();
+        // case RespCode.ChannelMsgRecv: return new RespChannelMsgRecv(frame).parse();
+        case RespCode.CurrTime: return new RespCurrTime(frame).parse();
+        case RespCode.NoMoreMessages: return new RespNoMoreMessages(frame).parse();
+        case RespCode.Ok: return new RespOk(frame).parse();
+        case RespCode.Err: return new RespErr(frame).parse();
       }
     } else {
       // we shoudn't be needing to parse commands apart from testing
       switch (frameCode) {
-        case FCmdCode.AppStart: return new FCmdAppStart(frame).parse();
-        case FCmdCode.GetContacts: return new FCmdGetContacts(frame).parse();
-        case FCmdCode.AddUpdateContact: return new FCmdAddUpdateContact(frame).parse();
-        case FCmdCode.SetDeviceTime: return new FCmdSetDeviceTime(frame).parse();
-        case FCmdCode.SendSelfAdvert: return new FCmdSendSelfAdvert(frame).parse();
-        case FCmdCode.SetAdvertName: return new FCmdSetAdvertName(frame).parse();
-        case FCmdCode.SendTxtMsg: return new FCmdSendTxtMsg(frame).parse();
-        case FCmdCode.SetRadioParams: return new FCmdSetRadioParams(frame).parse();
+        case CmdCode.AppStart: return new CmdAppStart(frame).parse();
+        case CmdCode.GetContacts: return new CmdGetContacts(frame).parse();
+        case CmdCode.AddUpdateContact: return new CmdAddUpdateContact(frame).parse();
+        case CmdCode.SetDeviceTime: return new CmdSetDeviceTime(frame).parse();
+        case CmdCode.SendSelfAdvert: return new CmdSendSelfAdvert(frame).parse();
+        case CmdCode.SetAdvertName: return new CmdSetAdvertName(frame).parse();
+        case CmdCode.SendTxtMsg: return new CmdSendTxtMsg(frame).parse();
+        case CmdCode.SetRadioParams: return new CmdSetRadioParams(frame).parse();
       }
    }
 
     throw new Error(`Unknown frame code: ${frameCode}`);
   }
 }
+
 export class SerialFrame extends FrameParser {
   static createFrame(frame: Uint8Array) {
     const frameHeader = new Uint8Array(3);

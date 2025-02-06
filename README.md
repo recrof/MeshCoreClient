@@ -1,2 +1,2 @@
 # MeshCoreClient
-Mobile and Desktop MeshCore client written in Tauri v2
+Mobile and Web MeshCore client written in Ionic

@@ -58,10 +58,10 @@ export function hexToUint8Array(hexString: string, maxLength?: number): Uint8Arr
 }
 
 export function uint8ArrayToHex(bytes: Uint8Array, opts?: uint8ArrayToHexOptions): string {
-  const hex = [];
+  const hex = new Array(bytes.length);
 
   for (let i = 0, l = bytes.length; i < l; i++) {
-    hex.push(DEC2HEX[bytes[i]]);
+    hex[i] = DEC2HEX[bytes[i]];
   }
 
   return hex.join(opts?.pretty ? ' ' : '');
