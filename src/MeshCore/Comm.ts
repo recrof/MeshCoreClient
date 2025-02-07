@@ -8,10 +8,14 @@ interface CommOptions {
 }
 
 export abstract class Comm extends EventTarget {
-  protected responseQueue: frameParserResult[] = [];
   private pendingResolve: ((frame: frameParserResult) => void) | null = null;
   private pushHandlers: Map<number, PushNotificationHandler> = new Map();
+  protected responseQueue: frameParserResult[] = [];
+  public onDisconnect = (param: any) => {};
+  public onConnect = (param: any) => {};
+
   public opts: CommOptions = { debug: false };
+
   constructor(opts?: CommOptions) {
     super();
     if(typeof opts === 'object') {
@@ -44,7 +48,7 @@ export abstract class Comm extends EventTarget {
     }
   }
 
-  public registerPushHandler(code: number, handler: PushNotificationHandler) {
+  protected registerPushHandler(code: number, handler: PushNotificationHandler) {
     this.pushHandlers.set(code, handler);
   }
 
@@ -91,6 +95,9 @@ export class SerialComm extends Comm {
   async connect() {
     this.port = await navigator.serial.requestPort();
     await this.port.open({ baudRate: 115200 });
+    this.onConnect(this.port);
+    this.port.addEventListener('disconnect', this.onDisconnect.bind(this, this.port));
+
     this.reader = this.port.readable.getReader();
     this.writer = this.port.writable.getWriter();
     this.readLoop();
@@ -138,19 +145,28 @@ export class SerialComm extends Comm {
     const data = SerialFrame.createFrame(frame.toUint8Array());
     await this.writer!.write(data);
   }
+
+  async reconnect() {
+    await this.connect()
+  }
 }
 
 export class BluetoothComm extends Comm {
   private device: BluetoothDevice | null = null;
   private characteristicRx: BluetoothRemoteGATTCharacteristic | undefined;
   private characteristicTx: BluetoothRemoteGATTCharacteristic | undefined;
+  public serviceUUID = '';
 
   async connect(serviceUUID: string) {
+    this.serviceUUID = serviceUUID;
     this.device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [serviceUUID] }],
     });
 
     const server = await this.device.gatt!.connect();
+    this.onConnect(this.device);
+    this.device.addEventListener('gattserverdisconnected', this.onDisconnect.bind(this, this.device));
+
     const service = await server.getPrimaryService(serviceUUID);
     const allCharacteristics = await service.getCharacteristics();
     this.characteristicRx = allCharacteristics.find(ch => ch.properties.read && ch.properties.notify);
@@ -171,7 +187,7 @@ export class BluetoothComm extends Comm {
   }
 
   async disconnect() {
-    await this.device?.gatt?.disconnect();
+    this.device?.gatt?.disconnect();
   }
 
   async sendCommand(frame: Frame) {
@@ -179,7 +195,11 @@ export class BluetoothComm extends Comm {
     await this.characteristicTx!.writeValue(frame.toUint8Array());
   }
 
-  static async getBluetoothDevices(serviceUUID, timeout = 5000) {
+  async reconnect() {
+    await this.connect(this.serviceUUID);
+  }
+
+  static async getBluetoothDevices(serviceUUID: string, timeout = 5000) {
     await BleClient.initialize();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

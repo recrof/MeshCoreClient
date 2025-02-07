@@ -676,7 +676,7 @@ export class RespSent extends Frame {
     const fields = [
       { value: RespCode.Sent, size: 1, type: FieldType.uint },
       { key: 'type', size: 1, type: FieldType.uint },
-      { key: 'expectedAckCode', size: 4, type: FieldType.uint },
+      { key: 'expectedAckCode', size: 4, type: FieldType.hexString },
       { key: 'suggestedTimeout', size: 4, type: FieldType.uint },
     ];
     super(paramsOrUint8Array, fields, opts);

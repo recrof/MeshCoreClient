@@ -1,6 +1,6 @@
-import { reactive } from 'vue';
+import { reactive, ComputedRef } from 'vue';
 import { defineStore } from 'pinia';
-import { Chat } from '@/MeshCore/App';
+import { Chat, AckCodeMap } from '@/MeshCore/App';
 import { SerialComm, BluetoothComm } from '@/MeshCore/Comm';
 import { Client, Contact } from '@/MeshCore/Client';
 import { Capacitor } from '@capacitor/core';
@@ -10,8 +10,12 @@ type PlatformType  = 'android' | 'ios' | 'web';
 type Platform = Record<PlatformType, boolean>;
 
 const app = reactive({
-  platform: { web: true } as Platform,
-  deviceInfo: {},
+  platform: {} as Platform,
+  client: {} as Client,
+  device: {
+    settings: {},
+    connected: false
+  },
   serial: {
     comm: new SerialComm(),
     selected: null,
@@ -32,11 +36,11 @@ const app = reactive({
   chat: {
     message: '',
     selected: null as Chat | null,
-    list: [] as Chat[]
+    list: [] as Chat[],
+    unreadCount: {} as ComputedRef,
+    ackCodes: {} as AckCodeMap,
   },
-  lastContactRefresh: 0,
-  client: {} as Client,
-  getCurrentTimestamp: () => Date.now() / 1000 | 0
+  getCurrentTimestamp: () => Date.now() / 1000 | 0,
 });
 
 // @ts-expect-error: ts being ts

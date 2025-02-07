@@ -24,6 +24,7 @@
     "@ionic/vue-router": "^8.0.0",
     "@types/dom-serial": "^1.0.6",
     "@types/web-bluetooth": "^0.0.20",
+    "date-fns": "^4.1.0",
     "ionicons": "^7.0.0",
     "pinia": "^2.3.1",
     "vue": "^3.3.0",

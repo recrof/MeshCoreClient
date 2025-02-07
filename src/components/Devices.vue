@@ -1,25 +1,34 @@
 <template>
-  <ion-content class="ion-padding">
-    <template v-if="app.platform.web">
-      <ion-button @click="connectWebSerial">Connect serial</ion-button>
-      <ion-button @click="connectWebBluetooth">Connect bluetooth</ion-button>
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Connection</ion-card-title>
+    </ion-card-header>
+    <template v-if="app.device.connected">
+      <ion-card-content>
+      <ion-item v-if="(app.comm instanceof BluetoothComm)">
+        <ion-icon slot="start" :icon="bluetooth"></ion-icon>
+        <ion-label> Connected to <code>{{ app.device.settings.name }}</code> via Bluetooth</ion-label>
+      </ion-item>
+      <ion-item v-else-if="(app.comm instanceof SerialComm)">
+        <ion-icon slot="start" :icon="link"></ion-icon>
+        <ion-label> Connected to <code>{{ app.device.settings.name }}</code> via USB Serial</ion-label>
+      </ion-item>
+      </ion-card-content>
+      <ion-button fill="clear" @click="disconnect()">Disconnect</ion-button>
     </template>
-    <ion-select v-else aria-label="Fruit" interface="popover" placeholder="Select device" v-model="app.selectedDevice">
-      <ion-select-option disabled><strong>Bluetooth</strong></ion-select-option>
-      <ion-select-option value="oranges">Oranges</ion-select-option>
-      <template v-if="app.platform.android">
-        <ion-select-option disabled><strong>Serial</strong></ion-select-option>
-        <ion-select-option value="bananas">Bananas</ion-select-option>
+    <template v-else>
+      <ion-card-content>
+        <ion-item>
+          <ion-icon slot="start" :icon="informationCircle"></ion-icon>
+          <ion-label>default bluetooth password is <code>123456</code></ion-label>
+        </ion-item>
+      </ion-card-content>
+      <template v-if="app.platform.web">
+        <ion-button fill="clear" @click="connectWebSerial">Connect serial</ion-button>
+        <ion-button fill="clear" @click="connectWebBluetooth">Connect bluetooth</ion-button>
       </template>
-    </ion-select>
-    <template v-if="app.comm && app.deviceInfo.name">
-    <ion-input label="Name" placeholder="Enter new name" v-model="app.deviceInfo.name" @keyup.enter="setName()">
-      <ion-button slot="end" @click="setName()">
-        <ion-icon slot="icon-only" :icon="save" aria-hidden="true"></ion-icon>
-      </ion-button>
-    </ion-input>
     </template>
-  </ion-content>
+  </ion-card>
 </template>
 
 <script>
@@ -29,25 +38,40 @@ import { BluetoothComm, SerialComm } from '@/MeshCore/Comm';
 import { Client } from '@/MeshCore/Client';
 import { initClient } from '@/MeshCore/App';
 import { useAppStore } from '@/stores/app';
-import { IonSelect, IonSelectOption, IonContent, IonIcon, IonButton, IonInput } from '@ionic/vue';
-import { save } from 'ionicons/icons';
+import {
+  IonSelect, IonSelectOption, IonContent, IonIcon, IonButton, IonItem, IonLabel,
+  IonCard, IonCardContent, IonCardHeader, IonCardTitle
+} from '@ionic/vue';
+
+import { bluetooth, link, informationCircle } from 'ionicons/icons';
 
 const app = useAppStore();
-async function setName() {
-  app.client.setAdvertName(app.deviceInfo.name);
-}
 
 async function connectWebSerial() {
+  app.device.connected = false;
   app.comm = new SerialComm({ debug: true });
+
+  app.comm.onConnect = () => app.device.connected = true;
+  app.comm.onDisconnect = () => app.device.connected = true;
+
   await app.comm.connect();
   app.client = new Client(app.comm);
   await initClient(app.client);
 }
 
 async function connectWebBluetooth() {
+  app.device.connected = false;
   app.comm = new BluetoothComm({ debug: true });
+
+  app.comm.onConnect = () => app.device.connected = true;
+  app.comm.onDisconnect = () => app.device.connected = true;
+
   await app.comm.connect(app.bluetooth.service, app.bluetooth.charRx, app.bluetooth.charTx);
   app.client = new Client(app.comm);
   await initClient(app.client);
 };
+
+async function disconnect() {
+  location.reload()
+}
 </script>

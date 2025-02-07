@@ -1,11 +1,13 @@
 <template>
-	<ion-card v-for="contact of app.contact.list">
+	<ion-card v-for="contact of app.contact.list" :key="contact.publicKey">
     <ion-card-header>
-      <ion-card-title><ion-icon :icon="person"></ion-icon> {{ contact.advName }}</ion-card-title>
-      <ion-card-subtitle><ion-icon :icon="key"></ion-icon> {{ contact.publicKey }}</ion-card-subtitle>
+      <ion-card-title>
+        {{ contact.advName }}
+      </ion-card-title>
     </ion-card-header>
 
     <ion-card-content>
+      <ion-icon :icon="key"></ion-icon> {{ contact.publicKey }}
     </ion-card-content>
 
     <ion-button fill="clear" @click="router.push(`/chat/${contact.publicKey}`)">Chat</ion-button>

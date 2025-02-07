@@ -18,5 +18,10 @@
 
 <script setup lang="ts">
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/vue';
+import { useAppStore } from '@/stores/app';
+import { onBeforeMount } from 'vue';
 import Settings from '@/components/Settings.vue';
+
+const app = useAppStore();
+onBeforeMount(() => app.device.connected ? null : location.href = '/');
 </script>

@@ -176,22 +176,29 @@ export class Client {
     return await this.comm.expectResponse(mcf.RespCode.Ok);
   }
 
-  async addUpdateContact(contact: mcf.CmdAddUpdateContact) {
+  async addUpdateContact(contact: mcf.ParamsAddUpdateContact) {
     const cmd = new mcf.CmdAddUpdateContact(contact);
     await this.comm.sendCommand(cmd);
 
     return await this.comm.expectResponse(mcf.RespCode.Ok);
   }
 
-  async sendTxtMsg(msg: mcf.CmdSendTxtMsg) {
+  async sendTxtMsg(msg: mcf.ParamsSendTxtMsg) {
     const cmd = new mcf.CmdSendTxtMsg(msg);
     await this.comm.sendCommand(cmd);
 
     return await this.comm.expectResponse(mcf.RespCode.Sent);
   }
 
-  async setRadioParams(params: mcf.CmdSetRadioParams) {
+  async setRadioParams(params: mcf.ParamsSetRadioParams) {
     const cmd = new mcf.CmdSetRadioParams(params);
+    await this.comm.sendCommand(cmd);
+
+    return await this.comm.expectResponse(mcf.RespCode.Ok);
+  }
+
+  async setTxPower(params: mcf.ParamsSetRadioTxPower) {
+    const cmd = new mcf.CmdSetRadioTxPower(params);
     await this.comm.sendCommand(cmd);
 
     return await this.comm.expectResponse(mcf.RespCode.Ok);

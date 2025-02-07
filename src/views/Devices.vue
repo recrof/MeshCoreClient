@@ -11,7 +11,6 @@
           <ion-title size="large">Devices</ion-title>
         </ion-toolbar>
       </ion-header>
-      <!-- content -->
       <Devices />
     </ion-content>
   </ion-page>
@@ -19,5 +18,9 @@
 
 <script setup lang="ts">
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/vue';
+import { useAppStore } from '@/stores/app';
 import Devices from '@/components/Devices.vue';
+
+const app = useAppStore();
+
 </script>

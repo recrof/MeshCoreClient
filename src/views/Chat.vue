@@ -31,5 +31,15 @@ export default {
 <script setup lang="ts">
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons } from '@ionic/vue';
 import Chat from '@/components/Chat.vue';
+import { onBeforeMount, onMounted } from 'vue';
 
+onBeforeMount(() => app.device.connected ? null : location.href = '/');
+
+onMounted(() => {
+  setTimeout(() => {
+    for(const message of app.chat.selected.messages) {
+      if(message.status < 0) message.status = 0;
+    }
+  })
+});
 </script>
