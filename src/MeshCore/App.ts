@@ -90,19 +90,13 @@ export function findMessageByAckCode(ackCode: string) {
   return null;
 }
 
-export function countUnreadMessages(chat: Chat) {
-  return chat.messages.reduce(
-    (count: number, item: Message) => count + item.status === MessageStatus.Unread ? 1 : 0,
-    0
-  );
-}
-
 export async function processPendingMessages() {
   const messages = await app.client.syncAllMessages();
   if(!messages.length) return;
   for(const message of messages) {
     const chat = app.chat.list.find(chat => chat.contact.publicKey.startsWith(message.pubKeyPrefix));
     if(chat == null) continue;
+
     chat?.messages.push({
       timestamp: message.senderTimestamp,
       text: message.text,
@@ -116,16 +110,18 @@ export async function processPendingMessages() {
 export async function refreshContacts() {
   app.contact.list = await app.client.getContacts(app.lastContactRefresh);
   for(const contact of app.contact.list) {
-    if(app.chat.list.some(chat => chat.publicKey === contact.publicKey)) continue;
+    if(app.chat.list.some(chat => chat.contact.publicKey === contact.publicKey)) continue;
 
     const chat = {
       updated: 0,
       contact,
       messages: [] as Message[],
-      unreadMessages: {} as ComputedRef
+      get unreadMessages() {
+        return this.messages.reduce(
+          (count: number, item: Message) => count + (item.status === MessageStatus.Unread ? 1 : 0),
+        0);
+      }
     }
-
-    chat.unreadMessages = computed(() => countUnreadMessages(chat));
 
     app.chat.list.push(chat)
   }
@@ -148,4 +144,4 @@ app.chat.unreadCount = computed(() => {
   );
 });
 
-Object.assign(window, { app, com, mcf, countUnreadMessages });
+Object.assign(window, { app, com, mcf });

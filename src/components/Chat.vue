@@ -5,8 +5,8 @@
         {{ msg.text }}
         <small>{{ messageTime(msg) }}</small>
         <ion-icon size="small" v-if="msg.status === MessageStatus.Pending" :icon="helpCircle"></ion-icon>
-        <ion-icon size="small" v-if="msg.status === MessageStatus.Sent" :icon="checkmarkCircle"></ion-icon>
-        <ion-icon size="small" v-else-if="msg.status === MessageStatus.Delivered" :icon="checkmarkDoneCircle"></ion-icon>
+        <ion-icon size="small" v-if="msg.status === MessageStatus.Sent" :icon="checkmark"></ion-icon>
+        <ion-icon size="small" v-else-if="msg.status === MessageStatus.Delivered" :icon="checkmarkDone"></ion-icon>
       </p>
     </div>
   </ion-content>
@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import { IonFooter, IonInput, IonButton, IonIcon, IonContent } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
-import { send, checkmarkCircle, checkmarkDoneCircle, helpCircle } from 'ionicons/icons';
+import { send, checkmark, checkmarkDone, helpCircle } from 'ionicons/icons';
 import { useAppStore, Chat } from '@/stores/app';
 import { MessageStatus, Message } from '@/MeshCore/App';
 import * as mcf from '@/MeshCore/Frame';

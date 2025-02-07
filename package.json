@@ -1,7 +1,7 @@
 {
   "name": "mesh-core-client",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,10 +20,9 @@
     "@capacitor/ios": "7.0.1",
     "@capacitor/keyboard": "7.0.0",
     "@capacitor/status-bar": "7.0.0",
+    "@ionic/storage": "^4.0.0",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
-    "@types/dom-serial": "^1.0.6",
-    "@types/web-bluetooth": "^0.0.20",
     "date-fns": "^4.1.0",
     "ionicons": "^7.0.0",
     "pinia": "^2.3.1",
@@ -31,6 +30,8 @@
     "vue-router": "^4.2.0"
   },
   "devDependencies": {
+    "@types/dom-serial": "^1.0.6",
+    "@types/web-bluetooth": "^0.0.20",
     "@capacitor/cli": "7.0.1",
     "@vitejs/plugin-legacy": "^5.0.0",
     "@vitejs/plugin-vue": "^4.0.0",
