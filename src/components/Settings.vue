@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import * as mcf from '@/MeshCore/Frame';
 import { useAppStore, Chat } from '@/stores/app';
 import { IonItem, IonList, IonInput, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle } from '@ionic/vue';
 import { } from 'ionicons/icons';
@@ -65,11 +66,17 @@ const app = useAppStore();
 async function setName() {
   await app.client.setAdvertName(app.device.settings.name);
   // re-announce with new name
-  await app.client.setAdvertName();
+  await app.client.sendSelfAdvert(mcf.SelfAdvertType.Flood);
 }
 
 async function setRadioSettings() {
-  await app.client.setAdvertName(app.device.settings.name);
+  await app.client.setRadioParams({
+    radioFreq: app.device.settings.radioFreq,
+    radioBw: app.device.settings.radioBw,
+    radioSf: app.device.settings.radioSf,
+    radioCr: app.device.settings.radioCr
+  });
+
   await app.comm.disconnect();
   app.device.connected = false;
   alert('settings saved, please restart the device.');

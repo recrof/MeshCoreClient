@@ -3,6 +3,7 @@ import { createPinia } from 'pinia';
 
 import App from './App.vue';
 import router from './router';
+import { registerSW } from 'virtual:pwa-register'
 
 import { IonicVue } from '@ionic/vue';
 
@@ -35,6 +36,10 @@ import '@ionic/vue/css/palettes/dark.system.css';
 
 /* Theme variables */
 import './theme/variables.css';
+
+const updateSW = registerSW({
+  onOfflineReady() {},
+})
 
 const pinia = createPinia();
 const app = createApp(App)

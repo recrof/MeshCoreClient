@@ -23,6 +23,7 @@ export enum MessageStatus {
   Pending = 1,
   Sent = 2,
   Delivered = 3,
+  Failed = 4
 };
 
 export interface Message {
@@ -30,7 +31,9 @@ export interface Message {
   text: string,
   own: boolean,
   status: MessageStatus,
-  ackCode: string
+  ackCode?: string,
+  roundTrip?: number,
+  retries?: number
 };
 
 export interface Chat {
@@ -50,9 +53,14 @@ export async function initClient(client: Client) {
 
   client.onSendConfirmed(async (data) => {
     const message = app.chat.ackCodes[data.ackCode] ?? findMessageByAckCode(data.ackCode);
-    if(!message) return;
+    if(!message) {
+      console.log('WARNING: did not find the message with ackCode:', data.ackCode)
+
+      return;
+    }
 
     message.status = MessageStatus.Delivered;
+    message.roundTrip = data.roundTrip;
   })
 
   client.onMsgWaiting(async (data) => {

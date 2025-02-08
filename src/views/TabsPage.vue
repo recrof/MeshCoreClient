@@ -8,9 +8,9 @@
           <ion-label>Devices</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button tab="contacts" href="/tabs/contacts" :disabled="!app.device.connected">
+        <ion-tab-button tab="discover" href="/tabs/discover" :disabled="!app.device.connected">
           <ion-icon aria-hidden="true" :icon="book" />
-          <ion-label>Contacts</ion-label>
+          <ion-label>Discover</ion-label>
         </ion-tab-button>
 
         <ion-tab-button tab="chats" href="/tabs/chats" :disabled="!app.device.connected">

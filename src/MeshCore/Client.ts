@@ -3,7 +3,15 @@ import { Comm } from './Comm';
 
 export interface Contact {
   publicKey: string,
-  name: string
+  type: mcf.AdvType,
+  flags: number,
+  outPathLen: number,
+  outPath: Uint8Array,
+  advName: string,
+  lastAdvert: number,
+  advLat: number,
+  advLon: number,
+  lastMod: number,
 }
 
 export type PushAdvert = {
