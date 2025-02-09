@@ -14,28 +14,32 @@
       </p>
     </div>
   </ion-content>
-  <ion-footer>
-    <ion-input label-placement="floating" label="Message" v-model="app.chat.message" @keyup.enter="sendMessage()" ref="messageBox" :counter="true" :maxlength="120">
-      <ion-button slot="end" @click="sendMessage()">
-        <ion-icon slot="icon-only" :icon="send" aria-hidden="true"></ion-icon>
-      </ion-button>
-    </ion-input>
+  <ion-footer class="padding-side border-top">
+    <form name="msgform" action="javascript:void(0)" @submit="sendMessage()" autocomplete="off">
+      <ion-textarea placeholder="Message" aria-label="Message" v-model="editMessage" ref="messageBox" :counter="true" :maxlength="120" :autofocus="true" :autocomplete="false" @keyup.enter.prevent="sendMessage()" rows="1" :auto-grow="true">
+        <ion-button slot="end" type="submit" size="small">
+          <ion-icon slot="icon-only" :icon="send" aria-hidden="true"></ion-icon>
+        </ion-button>
+      </ion-textarea>
+    </form>
   </ion-footer>
 </template>
 
 <script setup lang="ts">
-import { toastController, IonFooter, IonInput, IonButton, IonIcon, IonContent } from '@ionic/vue';
+import { toastController, IonFooter, IonTextarea, IonButton, IonIcon, IonContent } from '@ionic/vue';
 import { onMounted, ref, reactive } from 'vue';
 import { send, checkmark, checkmarkDone, hourglass, refresh, alertCircle } from 'ionicons/icons';
 import { useAppStore, Chat } from '@/stores/app';
 import { MessageStatus, Message } from '@/MeshCore/App';
 import * as mcf from '@/MeshCore/Frame';
+import { nextTick } from 'vue';
 
 const app = useAppStore();
 const chat = app.chat.selected as Chat | null;
 const messageBox = ref();
+let editMessage = ref('');
 
-onMounted(() => messageBox.value.$el.setFocus());
+onMounted(() => setTimeout(() => messageBox.value.$el.setFocus(), 0));
 
 function messageTime(msg: Message) {
   const messageDt = new Date(msg.timestamp * 1000);
@@ -62,9 +66,8 @@ async function transmitMessage(publicKey: string, messageText: string, attempt) 
 }
 
 async function sendMessage() {
-  const messageText = app.chat.message;
   if(!chat) return;
-
+  const messageText = editMessage.value;
   const contact = chat.contact;
   const message = reactive({
     text: messageText,
@@ -77,7 +80,7 @@ async function sendMessage() {
 
   chat.messages.push(message);
 
-  app.chat.message = '';
+  editMessage.value = '';
 
   const msgStatus = await transmitMessage(contact.publicKey, messageText, message.retries);
   app.chat.ackCodes[msgStatus.expectedAckCode] = message;
@@ -122,6 +125,12 @@ async function showRoundTrip(roundTrip: number | unknown) {
 ion-content.flex {
   display: flex;
 }
+.margin-side {
+  padding: 0 5px;
+}
+.border-top {
+  border-top: 1px solid #333;
+}
 .messages {
   position: absolute;
   top: 0;
@@ -158,5 +167,21 @@ ion-content.flex {
   background-color: var(--ion-color-danger-shade);
   color: #ddd;
 }
+.messages p ion-icon {
+  min-width: 16px;
+}
 
+form ion-textarea {
+  min-height: 32px !important;
+}
+
+form ion-textarea .sc-ion-textarea-md {
+  --padding-top: 8px;
+}
+form ion-textarea textarea {
+  margin-top: 8px !important;
+}
+form ion-button {
+  min-height: 32px !important;
+}
 </style>

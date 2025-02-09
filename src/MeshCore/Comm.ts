@@ -4,7 +4,9 @@ import { uint8ArrayConcat, uint8ArrayToHexPretty } from './Helpers';
 
 type PushNotificationHandler = (frame: frameParserResult) => void;
 interface CommOptions {
-  debug?: boolean
+  debug?: boolean,
+  onConnect?: (param: any) => void,
+  onDisconnect?: (param: any) => void
 }
 
 export abstract class Comm extends EventTarget {
@@ -19,6 +21,9 @@ export abstract class Comm extends EventTarget {
   constructor(opts?: CommOptions) {
     super();
     if(typeof opts === 'object') {
+      if(typeof opts.onConnect === 'function') this.onConnect = opts?.onConnect;
+      if(typeof opts.onDisconnect === 'function') this.onDisconnect = opts?.onDisconnect;
+
       this.opts = { ...this.opts, ...opts }
     }
   }

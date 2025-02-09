@@ -24,8 +24,8 @@
         </ion-item>
       </ion-card-content>
       <template v-if="app.platform.web">
-        <ion-button fill="clear" @click="connectWebSerial">Connect serial</ion-button>
-        <ion-button fill="clear" @click="connectWebBluetooth">Connect bluetooth</ion-button>
+        <ion-button fill="clear" @click="connect('serial')">Connect serial</ion-button>
+        <ion-button fill="clear" @click="connect('bluetooth')">Connect bluetooth</ion-button>
       </template>
     </template>
   </ion-card>
@@ -34,6 +34,7 @@
 <script>
 </script>
 <script setup lang="ts">
+import { requestNotificationAccess } from '@/MeshCore/App';
 import { BluetoothComm, SerialComm } from '@/MeshCore/Comm';
 import { Client } from '@/MeshCore/Client';
 import { initClient } from '@/MeshCore/App';
@@ -47,29 +48,27 @@ import { bluetooth, link, informationCircle } from 'ionicons/icons';
 
 const app = useAppStore();
 
-async function connectWebSerial() {
+async function connect(type: string) {
   app.device.connected = false;
-  app.comm = new SerialComm({ debug: true });
 
-  app.comm.onConnect = () => app.device.connected = true;
-  app.comm.onDisconnect = () => app.device.connected = true;
+  const commOptions = {
+    debug: true,
+    onConnect: () => app.device.connected = true,
+    onDisconnect: () => app.device.connected = true,
+  };
 
-  await app.comm.connect();
+  if(type === 'serial') {
+    app.comm = new SerialComm(commOptions);
+    await app.comm.connect();
+  } else {
+    app.comm = new BluetoothComm(commOptions);
+    await app.comm.connect(app.bluetooth.service, app.bluetooth.charRx, app.bluetooth.charTx);
+  }
+
+  requestNotificationAccess();
   app.client = new Client(app.comm);
   await initClient(app.client);
 }
-
-async function connectWebBluetooth() {
-  app.device.connected = false;
-  app.comm = new BluetoothComm({ debug: true });
-
-  app.comm.onConnect = () => app.device.connected = true;
-  app.comm.onDisconnect = () => app.device.connected = true;
-
-  await app.comm.connect(app.bluetooth.service, app.bluetooth.charRx, app.bluetooth.charTx);
-  app.client = new Client(app.comm);
-  await initClient(app.client);
-};
 
 async function disconnect() {
   location.reload()

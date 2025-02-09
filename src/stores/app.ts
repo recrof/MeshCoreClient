@@ -39,6 +39,7 @@ const app = reactive({
     list: [] as Chat[],
     unreadCount: {} as ComputedRef,
     ackCodes: {} as AckCodeMap,
+    notifAudio: new Audio('/alert.mp3'),
   },
   getCurrentTimestamp: () => Date.now() / 1000 | 0,
 });

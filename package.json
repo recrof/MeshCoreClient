@@ -32,6 +32,7 @@
   "devDependencies": {
     "@capacitor/cli": "7.0.1",
     "@types/dom-serial": "^1.0.6",
+    "@types/serviceworker": "^0.0.120",
     "@types/web-bluetooth": "^0.0.20",
     "@vitejs/plugin-legacy": "^5.0.0",
     "@vitejs/plugin-vue": "^4.0.0",

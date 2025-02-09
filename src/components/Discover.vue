@@ -8,11 +8,12 @@
     </ion-card-header>
 
     <ion-card-content>
-      <ion-icon :icon="time"></ion-icon> {{ lastUpdateRelative(contact) }}<br>
-      <ion-icon :icon="key"></ion-icon> {{ contact.publicKey }}
+      <ion-icon :icon="time"></ion-icon> <span class="time-announced">{{ lastUpdateRelative(contact) }}</span><br>
+      <ion-icon :icon="key"></ion-icon> <span class="public-key">{{ contact.publicKey }}</span>
     </ion-card-content>
 
     <ion-button fill="clear" @click="router.push(`/chat/${contact.publicKey}`)" :disabled="contact.type !== mcf.AdvType.Chat">Chat</ion-button>
+    <ion-button fill="clear" @click="copyPublicKey(contact)">Copy Key</ion-button>
   </ion-card>
 </template>
 
@@ -46,4 +47,19 @@ function getIconType(type: mcf.AdvType) {
 function lastUpdateRelative(contact: Contact) {
   return formatRelative(new Date(), new Date(contact.lastAdvert * 1000))
 }
+
+function copyPublicKey(contact: Contact) {
+  navigator.clipboard.writeText(contact.publicKey);
+}
 </script>
+
+<style>
+.public-key {
+  font-family: monospace;
+  display: inline-block;
+  max-width: 120px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+</style>
