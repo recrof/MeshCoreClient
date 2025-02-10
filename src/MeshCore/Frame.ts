@@ -26,6 +26,7 @@ export enum CmdCode {
   SyncNextMessage = 10,
   SetRadioParams = 11,
   SetTxPower = 12,
+  ResetPath = 13,
 }
 
 export enum RespCode {
@@ -528,6 +529,25 @@ export class CmdSetRadioTxPower extends Frame {
 }
 
 /*
+  CMD_RESET_PATH {
+    code: byte,    // constant 13
+    public_key: bytes(32)
+  }
+*/
+export interface ParamsCmdResetPath {
+  publicKey: string,
+}
+export class CmdResetPath extends Frame {
+  constructor(paramsOrUint8Array: ParamsCmdResetPath | Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: CmdCode.ResetPath, size: 1, type: FieldType.uint },
+      { key: 'publicKey', size: 32, type: FieldType.hexString},
+    ];
+    super(paramsOrUint8Array, fields, opts);
+  }
+}
+
+/*
   RESP_CODE_SELF_INFO {
     code: byte,   // constant: 5
     type: byte,   // one of ADV_TYPE_*
@@ -714,6 +734,30 @@ export class RespContactMsgRecv extends Frame {
   }
 }
 
+// TODO: RX channel messages
+/*
+export interface ParamsChannelMsgRecv {
+  pubKeyPrefix: string,
+  pathLen: number,
+  txtType: TxtType,
+  senderTimestamp: number,
+  text: string,
+}
+export class RespChannelMsgRecv extends Frame {
+  constructor(paramsOrUint8Array: ParamsChannelMsgRecv | Uint8Array, opts?: FrameOptions) {
+    const fields = [
+      { value: RespCode.ChannelMsgRecv, size: 1, type: FieldType.uint },
+      { key: 'pubKeyPrefix', size: 6, type: FieldType.hexString },
+      { key: 'pathLen', size: 1, type: FieldType.uint },
+      { key: 'txtType', size: 1, type: FieldType.uint },
+      { key: 'senderTimestamp', size: 4, type: FieldType.uint },
+      { key: 'text', type: FieldType.string },
+    ];
+    super(paramsOrUint8Array, fields, opts);
+  }
+}
+*/
+
 /*
   RESP_CODE_CONTACTS_START {
     code: byte,   // constant 2
@@ -858,6 +902,8 @@ export class FrameParser {
         case CmdCode.SetAdvertName: return new CmdSetAdvertName(frame).parse();
         case CmdCode.SendTxtMsg: return new CmdSendTxtMsg(frame).parse();
         case CmdCode.SetRadioParams: return new CmdSetRadioParams(frame).parse();
+        case CmdCode.SetTxPower: return new CmdSetRadioTxPower(frame).parse();
+        case CmdCode.ResetPath: return new CmdResetPath(frame).parse();
       }
    }
 
