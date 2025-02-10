@@ -1,4 +1,7 @@
 <template>
+  <ion-card>
+    <ion-button fill="clear" @click="reAnnounce">Self re-announce</ion-button>
+  </ion-card>
 	<ion-card v-for="contact of app.contact.list.sort(sortByLatestAdvert)" :key="contact.publicKey">
     <ion-card-header>
       <ion-card-title>
@@ -29,6 +32,10 @@ import { formatRelative } from 'date-fns';
 
 const router = useRouter();
 const app = useAppStore();
+
+function reAnnounce() {
+  app.client.sendSelfAdvert()
+}
 
 function sortByLatestAdvert(a: Contact, b: Contact) {
   return b.lastAdvert - a.lastAdvert;

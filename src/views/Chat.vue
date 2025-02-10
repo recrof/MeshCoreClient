@@ -12,28 +12,25 @@
   </ion-page>
 </template>
 
-<script lang="ts">
-import { useAppStore } from '@/stores/app';
-import { useRouter } from 'vue-router';
-
-const app = useAppStore();
-
-export default {
-  beforeRouteEnter: function (to) {
-    const activeChat = app.chat.list.find(ch => ch.contact.publicKey.startsWith(to.params.publicKey));
-    app.chat.selected = activeChat;
-    if(!activeChat) { useRouter().back() }
-    console.log(activeChat);
-  }
-}
-</script>
-
 <script setup lang="ts">
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonBackButton, IonButtons } from '@ionic/vue';
 import Chat from '@/components/Chat.vue';
-import { onBeforeMount, onMounted } from 'vue';
+import { onBeforeMount, onMounted, onUnmounted } from 'vue';
+import { useAppStore } from '@/stores/app';
+import { useRoute, useRouter } from 'vue-router';
 
-onBeforeMount(() => app.device.connected ? null : location.href = '/');
+const app = useAppStore();
+
+onBeforeMount(() => {
+  const route = useRoute();
+
+  const activeChat = app.chat.list.find(ch => ch.contact.publicKey.startsWith(route.params.publicKey));
+  app.chat.selected = activeChat;
+  if(!activeChat) { useRouter().back() }
+  console.log(activeChat);
+
+  app.device.connected ? null : location.href = '/'
+});
 
 onMounted(() => {
   setTimeout(() => {
@@ -42,4 +39,9 @@ onMounted(() => {
     }
   })
 });
+
+onUnmounted(() => {
+  app.chat.selected = null
+})
+
 </script>

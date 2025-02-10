@@ -70,16 +70,21 @@ async function setName() {
 }
 
 async function setRadioSettings() {
-  await app.client.setRadioParams({
-    radioFreq: app.device.settings.radioFreq,
-    radioBw: app.device.settings.radioBw,
-    radioSf: app.device.settings.radioSf,
-    radioCr: app.device.settings.radioCr
-  });
+  try {
+    await app.client.setRadioParams({
+      radioFreq: app.device.settings.radioFreq,
+      radioBw: app.device.settings.radioBw,
+      radioSf: app.device.settings.radioSf,
+      radioCr: app.device.settings.radioCr
+    });
 
-  await app.comm.disconnect();
-  app.device.connected = false;
-  alert('settings saved, please restart the device.');
-  location.reload();
+    await app.comm.disconnect();
+    app.device.connected = false;
+    alert('Settings saved, please restart the device.');
+    location.reload();
+  }
+  catch(e) {
+    alert('Settings were NOT saved, please check your input and try again.')
+  }
 }
 </script>
