@@ -186,25 +186,14 @@ export async function requestNotificationAccess() {
 }
 
 export function showNotification(title: string, body: string, url: string) {
-  broadcast.postMessage({
-    type: 'SHOW_NOTIFICATION',
-    title,
+  new Notification(title, {
     body: shortenText(body),
-    url,
-    publicKey: app.device.settings.publicKey
-  });
+    icon: '/favicon-96x96.png'
+  }).addEventListener('click', () => {
+    window.focus();
+    router.push(url);
+  })
 }
-
-broadcast.addEventListener('message', (event) => {
-  const data = event.data;
-
-  console.log('message:', data);
-  if (data && data.type === 'NOTIFICATION_CLICK') {
-    if(data.target !== app.device.settings.publicKey) return;
-    console.log('redirecting to:', data.url);
-    router.push(data.url);
-  }
-});
 
 app.chat.unreadCount = computed(() => {
   if(app.chat.list.length === 0) return 0;
