@@ -1,13 +1,12 @@
 /// <reference types="vitest" />
 
-import legacy from '@vitejs/plugin-legacy'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 import { defineConfig } from 'vite'
 import { VitePWA, VitePWAOptions } from 'vite-plugin-pwa';
 
 const vitePwaConfig = {
-  registerType: 'prompt',
+  registerType: 'autoUpdate',
   workbox: {
     globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
     sourcemap: true

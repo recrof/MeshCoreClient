@@ -1,6 +1,12 @@
 <template>
   <ion-card>
-    <ion-button fill="clear" @click="reAnnounce">Self re-announce</ion-button>
+    <ion-card-header>
+      <ion-card-title>
+        Send advert
+      </ion-card-title>
+    </ion-card-header>
+    <ion-button fill="clear" @click="reAdvert(mcf.SelfAdvertType.ZeroHop)">Zero-hop</ion-button>
+    <ion-button fill="clear" @click="reAdvert(mcf.SelfAdvertType.Flood)">Flood</ion-button>
   </ion-card>
 	<ion-card v-for="contact of app.contact.list.sort(sortByLatestAdvert)" :key="contact.publicKey">
     <ion-card-header>
@@ -33,8 +39,14 @@ import { formatRelative } from 'date-fns';
 const router = useRouter();
 const app = useAppStore();
 
-function reAnnounce() {
-  app.client.sendSelfAdvert()
+function reAdvert(type: mcf.SelfAdvertType) {
+  const warningMessage =
+    'You are about to flood ENTIRE network with your advert.\n'+
+    'This puts severe stress on the mesh, please use this feature sparingly!';
+
+  if(type === mcf.SelfAdvertType.Flood && !confirm(warningMessage)) { return }
+
+  app.client.sendSelfAdvert(type);
 }
 
 function sortByLatestAdvert(a: Contact, b: Contact) {

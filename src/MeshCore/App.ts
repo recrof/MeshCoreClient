@@ -6,7 +6,6 @@ import * as com from './Comm';
 import router from '../router';
 
 const app = useAppStore();
-const broadcast = new BroadcastChannel('notification-channel');
 
 export interface Serial {
   name: string,
@@ -82,11 +81,9 @@ export async function initClient(client: Client) {
     await client.setDeviceTime(epochNow);
   };
 
-  await client.sendSelfAdvert(1);
-
+  await client.sendSelfAdvert();
   await refreshContacts();
   await processPendingMessages();
-
 };
 
 export function findMessageByAckCode(ackCode: string) {
@@ -186,14 +183,30 @@ export async function requestNotificationAccess() {
 }
 
 export function showNotification(title: string, body: string, url: string) {
-  new Notification(title, {
-    body: shortenText(body),
-    icon: '/favicon-96x96.png'
-  }).addEventListener('click', () => {
-    window.focus();
-    router.push(url);
-  })
+  if (navigator.serviceWorker.controller) {
+    console.log('postMessage to sw: SHOW_NOTIFICATION');
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SHOW_NOTIFICATION',
+      title,
+      body: shortenText(body),
+      url,
+      publicKey: app.device.settings.publicKey
+    });
+  }
 }
+
+navigator.serviceWorker.addEventListener('message', (event) => {
+  if (event.data.type === 'GET_PUBLIC_KEY') {
+    const port = event.ports[0];
+    port.postMessage({ publicKey: app.device.settings.publicKey });
+  } else if (event.data.type === 'NAVIGATE_TO_URL') {
+    const url = event.data.url;
+    router.push(url).then(() => {
+      const port = event.ports[0];
+      port.postMessage({ success: true });
+    });
+  }
+});
 
 app.chat.unreadCount = computed(() => {
   if(app.chat.list.length === 0) return 0;
